@@ -19,23 +19,43 @@ Hệ thống điều phối và cân bằng tải đa tài khoản Google OAuth 
 
 ---
 
-## 🚀 Cài Đặt Nhanh (1 Dòng Lệnh Duy Nhất)
+## 🚀 2 Cách Cài Đặt 1 Dòng Lệnh Duy Nhất
 
-### Cách 1: Tự động qua Curl (Khuyến nghị cho macOS & Linux)
-Mở Terminal và dán dòng lệnh sau:
+### ⚡ Cách 1: Tự động qua Curl (Khuyên dùng cho macOS & Linux)
+Chỉ cần mở Terminal và dán đúng 1 dòng lệnh:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kipkip11/switch-google/main/install.sh | bash
 ```
-
-### Cách 2: Cài đặt toàn cục qua NPM
-```bash
-npm install -g git+https://github.com/kipkip11/switch-google.git
-```
-*(Sau khi cài đặt, bạn có thể gõ ngay lệnh `switch-google` ở bất kỳ thư mục nào trên máy).*
+> **Cơ chế hoạt động của `install.sh`:**
+> 1. Tự động kiểm tra môi trường hệ thống: Node.js (phiên bản 18 trở lên), NPM và Git.
+> 2. Tự động tải, cài đặt dependencies, biên dịch TypeScript sang JavaScript chuẩn và thiết lập lệnh `switch-google` toàn cục.
+> 3. Cơ chế dự phòng thông minh (Smart Fallback): Nếu không có quyền root/sudo với thư mục npm global, script sẽ tự động cài đặt vào `~/.switch-google/core` và liên kết lệnh vào `~/.local/bin/switch-google`.
+> 4. Xuất hướng dẫn sử dụng và kiểm tra tính sẵn sàng của CLI ngay lập tức.
 
 ---
 
-## 🛠️ Cài Đặt Thủ Công Từ Mã Nguồn
+### 📦 Cách 2: Cài đặt toàn cục qua NPM
+Nếu máy tính của bạn đã có Node.js:
+```bash
+npm install -g git+https://github.com/kipkip11/switch-google.git
+```
+*(Hệ thống đã cấu hình tự động kích hoạt `prepare: npm run build`, sau khi cài đặt bạn có thể gõ trực tiếp lệnh `switch-google` ở bất kỳ thư mục nào trên máy).*
+
+Hoặc khởi chạy tức thì mà không cần cài đặt:
+```bash
+npx git+https://github.com/kipkip11/switch-google.git serve
+```
+
+---
+
+### 🛠️ Cách 3: Cài đặt thủ công từ mã nguồn
+```bash
+git clone https://github.com/kipkip11/switch-google.git
+cd switch-google
+npm install
+npm run build
+npm run serve
+```
 
 ---
 
