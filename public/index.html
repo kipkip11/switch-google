@@ -1170,6 +1170,16 @@
     </div>
 
     <div class="header-actions">
+      <!-- 1-Click Update Button -->
+      <button class="btn-action" id="btn-system-update" style="display:none; padding: 6px 12px; font-size: 0.78rem; align-items: center; gap: 5px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: 1px solid #34d399;" onclick="triggerSystemUpdate()" title="Phát hiện bản cập nhật mới trên GitHub. Bấm để tự động cập nhật">
+        <span>🚀</span> <span id="update-btn-text">Cập Nhật Mới</span>
+      </button>
+
+      <!-- Auto-Start Boot Toggle -->
+      <button class="btn-action" id="btn-toggle-autostart" style="padding: 6px 10px; font-size: 0.76rem; display: flex; align-items: center; gap: 4px;" onclick="toggleAutoStart()" title="Bật/Tắt tự động chạy ngầm khi mở máy">
+        <span id="autostart-icon">⚙️</span> <span id="autostart-label">Khởi Động</span>
+      </button>
+
       <!-- Backup / Restore Tools -->
       <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="downloadBackup()" title="Xuất toàn bộ Profile, Tokens và Cấu hình ra file JSON">
         <span>💾</span> Sao Lưu
@@ -2661,9 +2671,86 @@
       } catch (_) {}
     }
 
-    // Initial Sync & Realtime Polling (every 2.5s)
+    // --- SYSTEM VERSION & DAEMON CONTROLS ---
+    let currentSystemInfo = null;
+
+    async function checkSystemVersion() {
+      try {
+        const res = await fetch('/api/system/version');
+        const data = await res.json();
+        currentSystemInfo = data;
+
+        const updateBtn = document.getElementById('btn-system-update');
+        if (updateBtn) {
+          if (data.hasUpdate) {
+            updateBtn.style.display = 'inline-flex';
+            const btnText = document.getElementById('update-btn-text');
+            if (btnText) btnText.innerText = `Bản Mới (${data.latestCommit})`;
+          } else {
+            updateBtn.style.display = 'none';
+          }
+        }
+
+        const autostartIcon = document.getElementById('autostart-icon');
+        const autostartLabel = document.getElementById('autostart-label');
+        if (data.daemon && autostartLabel) {
+          if (data.daemon.autoStartEnabled) {
+            autostartIcon.innerText = '✅';
+            autostartLabel.innerText = 'Tự Bật: BẬT';
+          } else {
+            autostartIcon.innerText = '⚪';
+            autostartLabel.innerText = 'Tự Bật: TẮT';
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function triggerSystemUpdate() {
+      if (!confirm('Bạn có muốn cập nhật Switch Google lên phiên bản mới nhất từ GitHub không?\nQuá trình tải và build lại sẽ diễn ra trong vài giây.')) return;
+      toast('⏳ Đang tải bản cập nhật từ GitHub và build lại hệ thống...');
+      try {
+        const res = await fetch('/api/system/update', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert('✓ Cập nhật thành công!\nTrang sẽ tự động tải lại sau 2 giây.');
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          alert('Lỗi cập nhật: ' + data.message);
+        }
+      } catch (err) {
+        alert('Lỗi kết nối khi cập nhật: ' + err.message);
+      }
+    }
+
+    async function toggleAutoStart() {
+      const isEnabled = currentSystemInfo?.daemon?.autoStartEnabled || false;
+      const willEnable = !isEnabled;
+      toast(`Đang ${willEnable ? 'kích hoạt' : 'hủy'} tự khởi động cùng máy tính...`);
+      try {
+        const res = await fetch('/api/system/daemon/autostart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: willEnable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast(`✓ ${data.message}`);
+          checkSystemVersion();
+        } else {
+          alert('Lỗi: ' + data.message);
+        }
+      } catch (err) {
+        alert('Lỗi kết nối: ' + err.message);
+      }
+    }
+
+    // Initial Sync & Realtime Polling
     fetchSwitchStatus();
     setInterval(fetchSwitchStatus, 2500);
+
+    // Version & Daemon Sync (Immediately & every 60s)
+    checkSystemVersion();
+    setInterval(checkSystemVersion, 60000);
   </script>
 </body>
 </html>

@@ -59,6 +59,17 @@ npm run serve
 
 ---
 
+### 🪟 Dành Riêng Cho Windows (PowerShell / One-Click Launcher)
+Nếu bạn sử dụng Windows, chỉ cần **click đúp chuột vào file `start.bat`** (hoặc gõ `.\start.ps1` trong PowerShell):
+- **[1] ⚡ Chạy ngầm (Ẩn hoàn toàn cửa sổ) + Mở Web + Tự bật khi khởi động máy**
+- **[2] 🖥️ Chạy thường có cửa sổ PowerShell (để theo dõi log trực tiếp)**
+- **[3] 🌐 Mở nhanh Web Dashboard (`http://localhost:1909`)**
+- **[4] 🛑 Dừng tiến trình chạy ngầm**
+- **[5] 🔄 Tự động cập nhật hệ thống từ GitHub**
+- **[6] ❌ Tắt tính năng tự khởi động cùng Windows**
+
+---
+
 ## 📖 Hướng Dẫn Sử Dụng (CLI)
 
 ### 1. Đăng nhập và thêm tài khoản

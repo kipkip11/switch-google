@@ -5,11 +5,13 @@ import { ProfileManager } from '../profiles/manager';
 import { AccountRotator } from '../profiles/rotator';
 import { createOpenAiRouter } from './openaiAdapter';
 import { usageTracker } from '../usage/tracker';
+import { DaemonManager } from '../services/daemon';
 
 export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   const app = express();
   const manager = new ProfileManager();
   const rotator = new AccountRotator(manager);
+  const daemon = new DaemonManager();
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -480,6 +482,46 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         res.setHeader('content-type', contentType);
       }
       res.send(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Check version and GitHub updates
+  app.get('/api/system/version', async (req: Request, res: Response) => {
+    try {
+      const updateInfo = await daemon.checkGithubUpdates();
+      const daemonStatus = daemon.getStatus(port);
+      res.json({
+        ...updateInfo,
+        daemon: daemonStatus
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Perform self-update from GitHub
+  app.post('/api/system/update', (req: Request, res: Response) => {
+    try {
+      const result = daemon.performSelfUpdate();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get daemon status
+  app.get('/api/system/daemon', (req: Request, res: Response) => {
+    res.json(daemon.getStatus(port));
+  });
+
+  // Toggle auto-start on boot
+  app.post('/api/system/daemon/autostart', (req: Request, res: Response) => {
+    try {
+      const { enabled } = req.body;
+      const result = enabled ? daemon.enableAutoStart(port) : daemon.disableAutoStart();
+      res.json({ ...result, autoStartEnabled: daemon.isAutoStartEnabled() });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
