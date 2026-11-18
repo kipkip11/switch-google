@@ -70,6 +70,40 @@ Nếu bạn sử dụng Windows, chỉ cần **click đúp chuột vào file `st
 
 ---
 
+## 🔄 Hướng Dẫn Cập Nhật Phiên Bản Mới (Update)
+
+Mọi dữ liệu tài khoản, tokens và khóa mã hóa đều được lưu độc lập tại `~/.switch-google/`, do đó **việc cập nhật mã nguồn mới hoàn toàn an toàn và không bao giờ làm mất tài khoản hay dữ liệu của bạn**.
+
+### ⚡ Cách 1: Nút Cập Nhật 1-Click trên Web Dashboard (Khuyên dùng)
+Khi có tính năng mới trên GitHub, thanh Header trên trang Web Dashboard (`http://localhost:1909`) sẽ tự động xuất hiện nút:  
+👉 **`🚀 Cập Nhật Mới (Commit)`**  
+Bạn chỉ cần nhấn vào nút đó, hệ thống sẽ tự động tải mã nguồn mới về và build lại trong vài giây.
+
+### 💻 Cách 2: Cập nhật qua Terminal / PowerShell
+- **Nếu đã cài đặt toàn cục:**
+  ```bash
+  switch-google update
+  ```
+- **Nếu hệ thống báo lệnh không nhận diện (`not recognized`):**  
+  Chạy trực tiếp qua NPX:
+  ```powershell
+  npx git+https://github.com/kipkip11/switch-google.git update
+  ```
+  Hoặc cài đè bản mới nhất vào hệ thống:
+  ```powershell
+  npm install -g git+https://github.com/kipkip11/switch-google.git
+  ```
+- **Trên macOS / Linux:**  
+  Chạy lại dòng lệnh cài đặt tự động:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/kipkip11/switch-google/main/install.sh | bash
+  ```
+
+### 🪟 Cách 3: Cập nhật trên Windows qua Launcher
+Chỉ cần click đúp vào file **`start.bat`** (hoặc gõ `.\start.ps1` trong PowerShell) và chọn số **`[5]`** để hệ thống tự động kiểm tra và nâng cấp.
+
+---
+
 ## 📖 Hướng Dẫn Sử Dụng (CLI)
 
 ### 1. Đăng nhập và thêm tài khoản
