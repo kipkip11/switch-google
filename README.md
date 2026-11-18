@@ -19,24 +19,23 @@ Hệ thống điều phối và cân bằng tải đa tài khoản Google OAuth 
 
 ---
 
-## 🚀 Cài Đặt & Cấu Hình
+## 🚀 Cài Đặt Nhanh (1 Dòng Lệnh Duy Nhất)
 
-### 1. Cài đặt dependencies
+### Cách 1: Tự động qua Curl (Khuyến nghị cho macOS & Linux)
+Mở Terminal và dán dòng lệnh sau:
 ```bash
-npm install
+curl -fsSL https://raw.githubusercontent.com/kipkip11/switch-google/main/install.sh | bash
 ```
 
-### 2. Thiết lập cấu hình `.env`
-Tạo file `.env` từ `.env.example`:
+### Cách 2: Cài đặt toàn cục qua NPM
 ```bash
-cp .env.example .env
+npm install -g git+https://github.com/kipkip11/switch-google.git
 ```
-Điền `GOOGLE_CLIENT_ID` và `GOOGLE_CLIENT_SECRET` của bạn vào file `.env` (hoặc sử dụng cấu hình mặc định sẵn có của Antigravity).
+*(Sau khi cài đặt, bạn có thể gõ ngay lệnh `switch-google` ở bất kỳ thư mục nào trên máy).*
 
-### 3. Build dự án
-```bash
-npm run build
-```
+---
+
+## 🛠️ Cài Đặt Thủ Công Từ Mã Nguồn
 
 ---
 

@@ -8,11 +8,18 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "start": "ts-node src/cli.ts",
     "serve": "ts-node src/cli.ts serve"
   },
+  "files": [
+    "dist",
+    "public",
+    "README.md",
+    "install.sh"
+  ],
   "keywords": [
     "google",
     "oauth",
