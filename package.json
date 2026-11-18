@@ -19,6 +19,7 @@
     "public",
     "README.md",
     "install.sh",
+    "install.ps1",
     "start.ps1",
     "start.bat"
   ],

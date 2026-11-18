@@ -20,22 +20,26 @@ Hệ thống điều phối và cân bằng tải đa tài khoản Google OAuth 
 
 ---
 
-## 🚀 2 Cách Cài Đặt 1 Dòng Lệnh Duy Nhất
+## 🚀 Cài Đặt 1 Dòng Lệnh Duy Nhất
 
-### ⚡ Cách 1: Tự động qua Curl (Khuyên dùng cho macOS & Linux)
-Chỉ cần mở Terminal và dán đúng 1 dòng lệnh:
-```bash
-curl -fsSL https://raw.githubusercontent.com/kipkip11/switch-google/main/install.sh | bash
+### 🪟 Dành Cho Windows (PowerShell)
+Mở PowerShell ở bất kỳ thư mục nào và dán đúng 1 dòng lệnh sau:
+```powershell
+irm https://raw.githubusercontent.com/kipkip11/switch-google/main/install.ps1 | iex
 ```
-> **Cơ chế hoạt động của `install.sh`:**
-> 1. Tự động kiểm tra môi trường hệ thống: Node.js (phiên bản 18 trở lên), NPM và Git.
-> 2. Tự động tải, cài đặt dependencies, biên dịch TypeScript sang JavaScript chuẩn và thiết lập lệnh `switch-google` toàn cục.
-> 3. Cơ chế dự phòng thông minh (Smart Fallback): Nếu không có quyền root/sudo với thư mục npm global, script sẽ tự động cài đặt vào `~/.switch-google/core` và liên kết lệnh vào `~/.local/bin/switch-google`.
-> 4. Xuất hướng dẫn sử dụng và kiểm tra tính sẵn sàng của CLI ngay lập tức.
+> *(Tự động tải mã nguồn, thiết lập lệnh `switch-google` toàn cục vào WindowsApps, kích hoạt chế độ tự chạy ngầm khi bật máy tính và mở ngay Web Dashboard `http://localhost:1909`).*
 
 ---
 
-### 📦 Cách 2: Cài đặt toàn cục qua NPM
+### 🍎 Dành Cho macOS & Linux (Terminal)
+Mở Terminal và dán dòng lệnh sau:
+```bash
+curl -fsSL https://raw.githubusercontent.com/kipkip11/switch-google/main/install.sh | bash
+```
+
+---
+
+### 📦 Cài Đặt Toàn Cục Qua NPM (Mọi Hệ Điều Hành)
 Nếu máy tính của bạn đã có Node.js:
 ```bash
 npm install -g git+https://github.com/kipkip11/switch-google.git
