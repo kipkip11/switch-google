@@ -1165,6 +1165,7 @@
         <div class="brand-title">
           Google <span>AI Switch</span>
           <span class="brand-badge">GS-400 PRO</span>
+          <span class="brand-badge" id="app-version-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">v1.1.0</span>
         </div>
       </div>
     </div>
@@ -2679,6 +2680,11 @@
         const res = await fetch('/api/system/version');
         const data = await res.json();
         currentSystemInfo = data;
+
+        if (data.currentVersion) {
+          const vBadge = document.getElementById('app-version-badge');
+          if (vBadge) vBadge.innerText = 'v' + data.currentVersion;
+        }
 
         const updateBtn = document.getElementById('btn-system-update');
         if (updateBtn) {

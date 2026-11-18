@@ -14,10 +14,21 @@ const program = new Command();
 const manager = new ProfileManager();
 const daemon = new DaemonManager();
 
+let appVersion = '1.1.0';
+try {
+  const pkg = require(path.join(__dirname, '..', 'package.json'));
+  appVersion = pkg.version || '1.1.0';
+} catch (_) {
+  try {
+    const pkg = require(path.join(__dirname, '..', '..', 'package.json'));
+    appVersion = pkg.version || '1.1.0';
+  } catch (_) {}
+}
+
 program
   .name('switch-google')
   .description('Quản lý đa tài khoản Google, phiên làm việc OAuth2 và cấp API cho bên thứ 3')
-  .version('1.0.0');
+  .version(appVersion);
 
 // Command: login
 program

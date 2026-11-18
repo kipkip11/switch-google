@@ -1,6 +1,7 @@
 # Switch Google - Multi-Account Profile, Session & Token Matrix Manager
 
 [![Switch-Google CI/CD Pipeline](https://github.com/kipkip11/switch-google/actions/workflows/ci.yml/badge.svg)](https://github.com/kipkip11/switch-google/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/Phi%C3%AAn%20b%E1%BA%A3n-v1.1.0-blue.svg)](https://github.com/kipkip11/switch-google/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/Node.js-20.x%20%7C%2022.x-green.svg)](https://nodejs.org/)
 
@@ -162,3 +163,12 @@ npm run type-check   # Kiểm tra kiểu TypeScript
 npm test             # Chạy toàn bộ test suites
 npm run build        # Biên dịch sang thư mục dist/
 ```
+
+---
+
+## 📜 Lịch Sử Phiên Bản (Changelog)
+
+| Phiên Bản | Ngày | Nội Dung & Tính Năng Mới |
+| :--- | :--- | :--- |
+| **`v1.1.0` (Mới nhất)** | 18/11/2026 | • Trung tâm điều khiển PowerShell & Windows Launcher (`start.bat`, `start.ps1`)<br>• Chạy ngầm hoàn toàn (Silent Daemon, không hiện cửa sổ)<br>• Tự khởi động cùng hệ điều hành khi bật máy (Windows Startup, macOS LaunchAgent, Linux systemd)<br>• Tự động cập nhật 1-Click trên Web Dashboard & lệnh `switch-google update`<br>• Hiển thị số phiên bản trực quan trên giao diện Web, CLI và README |
+| **`v1.0.0`** | 17/11/2026 | • Bản phát hành khởi tạo đầu tiên<br>• Quản lý đa tài khoản Google OAuth 2.0 & Gemini API Key<br>• Mã hóa bảo mật độc lập chuẩn AES-256-GCM<br>• Sơ đồ ma trận mạng Switch Rack RJ45 trực quan thời gian thực<br>• Cơ chế luân phiên tự động chống Rate Limit (429)<br>• Tích hợp CI/CD tự động toàn diện trên GitHub Actions |
