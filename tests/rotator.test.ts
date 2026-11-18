@@ -91,4 +91,32 @@ describe('AccountRotator', () => {
     expect(port3.linkStatus).toBe('down');
     expect(port3.isDisabled).toBe(true);
   });
+
+  test('should clean up rotator state and exclude deleted account', async () => {
+    rotator.markCooldown('acc2', 60);
+    rotator.toggleProfileDisabled('acc2', true);
+
+    // Delete account from manager
+    const deleted = manager.deleteProfile('acc2');
+    expect(deleted).toBe(true);
+
+    // Remove from rotator memory
+    rotator.removeAccount('acc2');
+
+    const ports = rotator.getPortStatuses();
+    expect(ports).toHaveLength(2);
+    expect(ports.some(p => p.profile === 'acc2')).toBe(false);
+
+    // Rotating should only cycle between acc1 and acc3
+    rotator.setStrategy('round-robin');
+    const first = await rotator.getNextAccount();
+    const second = await rotator.getNextAccount();
+    const third = await rotator.getNextAccount();
+
+    expect(['acc1', 'acc3']).toContain(first.profile);
+    expect(['acc1', 'acc3']).toContain(second.profile);
+    expect(['acc1', 'acc3']).toContain(third.profile);
+    expect(first.profile).not.toBe('acc2');
+    expect(second.profile).not.toBe('acc2');
+  });
 });

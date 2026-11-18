@@ -68,6 +68,14 @@ export class AccountRotator {
     return shouldDisable;
   }
 
+  public removeAccount(profileName: string): void {
+    this.stats.delete(profileName);
+    this.disabledProfiles.delete(profileName);
+    if (this.currentlyServingAccount === profileName) {
+      this.currentlyServingAccount = null;
+    }
+  }
+
   public getPortStatuses(): SwitchPortInfo[] {
     const profiles = this.manager.listProfiles();
     const activeName = this.manager.getActiveProfileName();

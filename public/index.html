@@ -1906,11 +1906,16 @@
               <span style="color: ${p.linkStatus === 'up' ? '#34d399' : p.linkStatus === 'banned' ? '#f87171' : '#fbbf24'};">${statusLabel}</span>
             </div>
 
-            <div class="mini-switch-row">
+            <div class="mini-switch-row" style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span class="mini-switch-text">${p.isDisabled ? 'Off' : 'Active'}</span>
-              <button class="switch-toggle-btn ${p.isDisabled ? '' : 'is-active'}" onclick="toggleSwitchPort('${p.profile}', ${!p.isDisabled})">
-                ${p.isDisabled ? '🔌 Cắm lại' : '⏏ Rút cáp'}
-              </button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button class="switch-toggle-btn ${p.isDisabled ? '' : 'is-active'}" onclick="toggleSwitchPort('${p.profile}', ${!p.isDisabled})">
+                  ${p.isDisabled ? '🔌 Cắm lại' : '⏏ Rút cáp'}
+                </button>
+                <button class="btn-action danger" style="padding: 2px 7px; font-size: 0.65rem; border-radius: 4px;" onclick="deleteAccount('${p.profile}')" title="Xóa tài khoản này khỏi hệ thống">
+                  🗑️
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -1990,6 +1995,7 @@
               <div style="display: flex; gap: 4px;">
                 <button class="btn-action" style="padding: 2px 6px; font-size: 0.62rem;" onclick="runPingSingle('${p.profile}')" title="Kiểm tra kết nối thực tế tới Google">⚡ Ping</button>
                 <button class="btn-action ${isActive ? 'primary' : ''}" style="padding: 2px 6px; font-size: 0.62rem;" onclick="switchActiveProfile('${p.profile}')" title="Kích hoạt cổng này">Chọn</button>
+                <button class="btn-action danger" style="padding: 2px 6px; font-size: 0.62rem;" onclick="deleteAccount('${p.profile}')" title="Xóa tài khoản này khỏi hệ thống">🗑️</button>
               </div>
             </div>
             <div class="topo-pin-right ${isActive ? 'active' : ''}" id="topo-pin-${idx}"></div>
@@ -2192,6 +2198,27 @@
           fetchSwitchStatus();
         }
       } catch (_) {}
+    }
+
+    async function deleteAccount(profile) {
+      if (!confirm(`Bạn có chắc chắn muốn xóa tài khoản [${profile}] khỏi Switch Google không?`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(profile)}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast(`✓ Đã xóa tài khoản [${profile}] thành công!`);
+          delete realHealthResults[profile];
+          fetchSwitchStatus();
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể xóa tài khoản'));
+        }
+      } catch (err) {
+        alert('Lỗi kết nối khi xóa tài khoản: ' + err.message);
+      }
     }
 
     // --- ANALYTICS DATA & CHARTS ---

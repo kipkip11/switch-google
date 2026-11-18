@@ -400,6 +400,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         res.status(404).json({ error: `Profile '${profile}' không tồn tại` });
         return;
       }
+      rotator.removeAccount(profile);
       res.json({ success: true, message: `Profile '${profile}' đã được xóa` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
