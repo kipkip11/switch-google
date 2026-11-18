@@ -1,0 +1,40 @@
+{
+  "name": "switch-google",
+  "version": "1.0.0",
+  "description": "Multi-account Google Profile & OAuth Manager with local token server",
+  "main": "dist/cli.js",
+  "bin": {
+    "switch-google": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "start": "ts-node src/cli.ts",
+    "serve": "ts-node src/cli.ts serve"
+  },
+  "keywords": [
+    "google",
+    "oauth",
+    "profile-manager",
+    "switch-account"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.14.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.5.0",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

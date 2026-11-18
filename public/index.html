@@ -1,0 +1,2642 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Switch Google - Enterprise AI Switch & Token Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js for Token Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-base: #060911;
+      --bg-surface: #0c111d;
+      --bg-card: rgba(16, 23, 38, 0.75);
+      --bg-card-hover: rgba(22, 32, 54, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-focus: rgba(56, 189, 248, 0.4);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #a855f7;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.12), transparent 45%),
+        radial-gradient(circle at 85% 100%, rgba(16, 185, 129, 0.08), transparent 45%);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* ======================================================== */
+    /* TOP SLIM NAVBAR                                          */
+    /* ======================================================== */
+    header {
+      padding: 12px 28px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(6, 9, 17, 0.88);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-title span { color: var(--primary); }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid var(--border-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .gateway-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #7dd3fc;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .gateway-pill:hover {
+      border-color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
+      background: rgba(15, 23, 42, 1);
+    }
+
+    .btn-add-account {
+      background: linear-gradient(135deg, #0284c7, #0ea5e9);
+      color: white;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 7px 15px;
+      border-radius: 9px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.3);
+    }
+    .btn-add-account:hover {
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.45);
+      transform: translateY(-1px);
+    }
+
+    /* ======================================================== */
+    /* MAIN WRAPPER & SUB-NAV TABS                              */
+    /* ======================================================== */
+    main {
+      flex: 1;
+      max-width: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 16px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .segmented-nav {
+      display: flex;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.65);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      width: fit-content;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .nav-tab-btn.active {
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--primary);
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
+    .tab-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 1px 6px;
+      border-radius: 12px;
+    }
+    .nav-tab-btn.active .tab-badge {
+      background: rgba(56, 189, 248, 0.25);
+      color: var(--primary);
+    }
+
+    .view-pane { display: none; flex-direction: column; gap: 20px; }
+    .view-pane.active { display: flex; animation: fadeIn 0.25s ease-out; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ======================================================== */
+    /* 1U MANAGED RACK SWITCH HARDWARE COMPONENT                */
+    /* ======================================================== */
+    .rack-switch-chassis {
+      background: linear-gradient(180deg, #182234 0%, #0d1523 45%, #080d17 100%);
+      border: 1.5px solid #28374f;
+      border-radius: 12px;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .rack-mount-ear {
+      width: 44px;
+      background: linear-gradient(90deg, #141c2a, #1f2b3e);
+      border-right: 2px solid #080e18;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      align-items: center;
+      padding: 16px 0;
+      flex-shrink: 0;
+    }
+    .rack-mount-ear.right {
+      border-right: none;
+      border-left: 2px solid #080e18;
+      background: linear-gradient(270deg, #141c2a, #1f2b3e);
+    }
+
+    .chassis-screw {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #64748b 35%, #1e293b 80%);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 1px rgba(255,255,255,0.2);
+      position: relative;
+    }
+    .chassis-screw::before {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 2px;
+      background: #0f172a;
+      top: 6px;
+      left: 3px;
+    }
+    .chassis-screw::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 8px;
+      background: #0f172a;
+      top: 3px;
+      left: 6px;
+    }
+
+    .chassis-faceplate {
+      flex: 1;
+      padding: 16px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .chassis-top-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .chassis-brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chassis-brand-text {
+      font-weight: 800;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      color: #e2e8f0;
+      text-transform: uppercase;
+    }
+    .chassis-brand-text span { color: var(--primary); }
+
+    .chassis-model-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #7dd3fc;
+      background: rgba(56, 189, 248, 0.12);
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      letter-spacing: 0.05em;
+    }
+
+    .chassis-sys-leds {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+    .sys-led {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+
+    .micro-led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #334155;
+      box-shadow: inset 0 1px 1px rgba(0,0,0,0.8);
+      transition: all 0.3s;
+    }
+    .micro-led.pwr-green {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981, inset 0 1px 1px rgba(255,255,255,0.7);
+    }
+    .micro-led.rot-cyan {
+      background: #06b6d4;
+      box-shadow: 0 0 8px #06b6d4, inset 0 1px 1px rgba(255,255,255,0.7);
+      animation: pulseRot 1.8s infinite;
+    }
+    @keyframes pulseRot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.9); }
+    }
+
+    .active-port-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(14, 165, 233, 0.4);
+      color: #38bdf8;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+
+    /* Switch Ports Matrix */
+    .ports-rack-matrix {
+      display: flex;
+      gap: 14px;
+      align-items: stretch;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    /* SFP+ Uplink Slot (Input from Hermes/Cursor) */
+    .sfp-uplink-bay {
+      background: rgba(11, 17, 30, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 9px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 130px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+    }
+    .sfp-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .sfp-hardware-cage {
+      width: 44px;
+      height: 32px;
+      background: #060911;
+      border: 1.5px solid #475569;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .fiber-transceiver-optic {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #0284c7;
+      box-shadow: 0 0 10px #38bdf8;
+      animation: pulseRot 2s infinite;
+    }
+    .sfp-subtext {
+      font-size: 0.66rem;
+      color: var(--text-subtle);
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .sfp-token-badge {
+      margin-top: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-align: center;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      cursor: help;
+    }
+    .sfp-token-val {
+      font-size: 0.82rem;
+      color: #7dd3fc;
+      font-weight: 800;
+    }
+
+    /* RJ45 Ports Flex Container */
+    .rj45-ports-deck {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .rj45-unit-card {
+      background: rgba(11, 17, 30, 0.9);
+      border: 1px solid #233045;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 148px;
+      flex: 1;
+      max-width: 210px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    .rj45-unit-card:hover {
+      border-color: #3b82f6;
+      background: rgba(15, 23, 42, 0.95);
+      transform: translateY(-2px);
+    }
+    .rj45-unit-card.serving-live {
+      border-color: #38bdf8;
+      background: rgba(14, 116, 144, 0.2);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+    }
+    .rj45-unit-card.state-banned {
+      border-color: rgba(239, 68, 68, 0.4);
+      opacity: 0.82;
+    }
+    .rj45-unit-card.state-down {
+      border-color: #1e293b;
+      opacity: 0.45;
+    }
+
+    .rj45-port-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+    }
+    .port-id-badge { font-weight: 800; color: #cbd5e1; }
+    .port-type-tag {
+      font-size: 0.65rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-muted);
+    }
+
+    /* RJ45 Physical Socket */
+    .rj45-socket-body {
+      height: 32px;
+      background: #05080e;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.85);
+    }
+    .rj45-socket-body::before {
+      content: '';
+      position: absolute;
+      top: 2px; left: 3px; right: 3px; height: 8px;
+      background: linear-gradient(180deg, #475569, #1e293b);
+      border-radius: 2px;
+    }
+    .rj45-gold-pins {
+      width: 18px;
+      height: 8px;
+      border-bottom: 2px solid #eab308;
+      position: absolute;
+      bottom: 3px;
+    }
+
+    /* Dual Port LEDs */
+    .jack-led-link {
+      position: absolute;
+      top: 4px;
+      left: 5px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #334155;
+    }
+    .jack-led-act {
+      position: absolute;
+      top: 4px;
+      right: 5px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #334155;
+    }
+    .jack-led-link.lnk-green { background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .jack-led-link.lnk-amber { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+    .jack-led-link.lnk-red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+    .jack-led-link.lnk-off { background: #334155; }
+    .jack-led-act.act-pulse {
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+      animation: pulseAct 0.35s infinite alternate;
+    }
+    @keyframes pulseAct {
+      from { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+      to { background: #0284c7; box-shadow: none; }
+    }
+
+    .port-email-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-main);
+    }
+    .port-stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* iOS Style Mini Toggle Switch */
+    .mini-switch-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .mini-switch-text {
+      font-size: 0.68rem;
+      color: var(--text-subtle);
+    }
+    .switch-toggle-btn {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 3px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .switch-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: white;
+    }
+    .switch-toggle-btn.is-active {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    /* Strategy Bar Card */
+    .strategy-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .strat-btn-group {
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 9px;
+      border: 1px solid var(--border-subtle);
+    }
+    .strat-choice-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .strat-choice-btn.active {
+      background: var(--primary);
+      color: #060911;
+      font-weight: 700;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    /* ======================================================== */
+    /* ANALYTICS & STAT CARDS                                   */
+    /* ======================================================== */
+    .kpi-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent);
+    }
+    .kpi-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+    .kpi-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -0.03em;
+    }
+
+    .chart-container-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    /* ======================================================== */
+    /* AUDIT LOG DATA GRID                                      */
+    /* ======================================================== */
+    .data-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      text-align: left;
+    }
+    .data-grid-table th {
+      padding: 10px 14px;
+      color: var(--text-subtle);
+      font-weight: 600;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(11, 17, 30, 0.5);
+    }
+    .data-grid-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .data-grid-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .pill-200 { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pill-err { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .pill-model { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.25); }
+
+    /* ======================================================== */
+    /* MODAL COMPONENT (ADD ACCOUNT)                            */
+    /* ======================================================== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 15, 0.75);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal-dialog {
+      background: #0d1424;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 540px;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 20px var(--primary-glow);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .modal-close-btn:hover { color: white; }
+
+    .input-box {
+      width: 100%;
+      background: #080d18;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .input-box:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+    }
+
+    /* Common Buttons */
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+    .btn-action.primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: white;
+    }
+    .btn-action.primary:hover { background: #0369a1; }
+    .btn-action.danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }
+
+    /* ======================================================== */
+    /* AI ROUTING TOPOLOGY MAP                                  */
+    /* ======================================================== */
+    .topology-container-card {
+      background: rgba(12, 17, 29, 0.88);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px 22px;
+      margin-top: 18px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    }
+    .topology-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 14px;
+    }
+    .topology-title-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #0284c7, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      box-shadow: 0 0 15px rgba(2, 132, 199, 0.35);
+    }
+    .topology-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+    .live-blink-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseAct 0.8s infinite alternate;
+    }
+    .topology-stage {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 18px;
+      position: relative;
+      min-height: 260px;
+    }
+    .topo-accounts-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 285px;
+      z-index: 2;
+      flex-shrink: 0;
+    }
+    .cable-error {
+      stroke: rgba(239, 68, 68, 0.65);
+      stroke-dasharray: 4, 4;
+      stroke-width: 2;
+      fill: none;
+      filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+    }
+    .topo-account-node {
+      background: rgba(16, 23, 38, 0.85);
+      border: 1px solid #233045;
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .topo-account-node:hover {
+      border-color: #38bdf8;
+      background: rgba(22, 32, 54, 0.95);
+    }
+    .topo-account-node.active-routing {
+      border-color: #38bdf8;
+      background: rgba(14, 165, 233, 0.16);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.28);
+    }
+    .topo-account-node.node-disabled {
+      opacity: 0.45;
+      border-color: #1e293b;
+    }
+    .topo-pin-right {
+      position: absolute;
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #475569;
+      border: 1.5px solid #0f172a;
+      transition: all 0.25s;
+    }
+    .topo-pin-right.active {
+      background: #38bdf8;
+      box-shadow: 0 0 10px #38bdf8;
+    }
+    .topo-badge {
+      font-size: 0.62rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .topo-badge.active {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .topo-cable-canvas-wrap {
+      flex: 1;
+      height: 250px;
+      position: relative;
+    }
+    #topo-svg-cables {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .cable-idle {
+      stroke: rgba(71, 85, 105, 0.35);
+      stroke-width: 1.5;
+      fill: none;
+      transition: stroke 0.3s;
+    }
+    .cable-disabled {
+      stroke: rgba(51, 65, 85, 0.25);
+      stroke-dasharray: 4, 4;
+      stroke-width: 1;
+      fill: none;
+    }
+    .cable-active {
+      stroke: url(#grad-active-cable);
+      stroke-width: 3.5;
+      fill: none;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+      stroke-dasharray: 8, 6;
+      animation: cableDash 0.7s linear infinite;
+    }
+    @keyframes cableDash {
+      to { stroke-dashoffset: -28; }
+    }
+    .topo-ai-hub-col {
+      width: 260px;
+      flex-shrink: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.8), rgba(12, 17, 29, 0.95));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 10px 32px rgba(0,0,0,0.5), inset 0 0 24px rgba(56, 189, 248, 0.08);
+    }
+    .ai-hub-orb-wrap {
+      position: relative;
+      width: 86px;
+      height: 86px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .ai-hub-radar-ring {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(56, 189, 248, 0.45);
+      animation: rotateClockwise 10s linear infinite;
+    }
+    .ai-hub-radar-ring.outer {
+      width: 86px;
+      height: 86px;
+      border: 1.5px dotted rgba(168, 85, 247, 0.35);
+      animation: rotateCounterClockwise 14s linear infinite;
+    }
+    .ai-hub-core-orb {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.3), rgba(168, 85, 247, 0.35));
+      border: 2px solid #38bdf8;
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.65), inset 0 0 12px rgba(168, 85, 247, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+    .ai-star-svg {
+      width: 28px;
+      height: 28px;
+      filter: drop-shadow(0 0 6px #38bdf8);
+    }
+    @keyframes rotateClockwise {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes rotateCounterClockwise {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(56, 189, 248, 0.55); }
+      50% { transform: scale(1.06); box-shadow: 0 0 32px rgba(168, 85, 247, 0.85); }
+    }
+    .ai-hub-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      color: #f8fafc;
+      text-align: center;
+    }
+    .ai-hub-subtitle {
+      font-size: 0.68rem;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-align: center;
+      margin-top: 2px;
+      padding: 1px 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    .ai-hub-metrics {
+      width: 100%;
+      margin-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ai-metric-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+    }
+    .ai-metric-item .m-lbl {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+    }
+    .ai-metric-item .m-val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #f8fafc;
+      font-size: 0.72rem;
+    }
+    .ai-metric-item .m-val.highlight {
+      color: #38bdf8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+    .ai-metric-item .m-val.success {
+      color: #34d399;
+    }
+
+    /* Toast */
+    #toast-notice {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      border: 1px solid var(--primary);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      display: none;
+      z-index: 200;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ======================================================== -->
+  <!-- TOP SLIM NAVBAR                                          -->
+  <!-- ======================================================== -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-logo-icon">⚡</div>
+      <div>
+        <div class="brand-title">
+          Google <span>AI Switch</span>
+          <span class="brand-badge">GS-400 PRO</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Backup / Restore Tools -->
+      <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="downloadBackup()" title="Xuất toàn bộ Profile, Tokens và Cấu hình ra file JSON">
+        <span>💾</span> Sao Lưu
+      </button>
+      <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="document.getElementById('file-import-backup').click()" title="Khôi phục dữ liệu từ file backup JSON">
+        <span>📥</span> Phục Hồi
+      </button>
+      <input type="file" id="file-import-backup" accept=".json" onchange="handleBackupFile(event)" style="display:none;" />
+
+      <!-- 1-Click Copy Gateway Base URL -->
+      <div class="gateway-pill" onclick="copyGatewayBaseUrl()" title="Bấm để sao chép Base URL">
+        <span style="color: #38bdf8;">Base URL:</span>
+        <span>http://localhost:1909/v1</span>
+        <span style="font-size: 0.85rem;">📋</span>
+      </div>
+
+      <!-- Add Port Modal Launcher -->
+      <button class="btn-add-account" onclick="openAddModal()">
+        <span>+</span> Cắm Cổng Mạng Mới
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- SUB-NAV SEGMENTED CONTROLS -->
+    <div class="segmented-nav">
+      <button class="nav-tab-btn active" id="tab-btn-switch" onclick="navigateTab('switch')">
+        🔌 1. Switch Rack & Luân Phiên <span class="tab-badge" id="badge-port-count">4</span>
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-analytics" onclick="navigateTab('analytics')">
+        📊 2. Biểu Đồ Token Realtime
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-logs" onclick="navigateTab('logs')">
+        📜 3. Lịch Sử Sử Dụng <span class="tab-badge" id="badge-log-count">0</span>
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-keys" onclick="navigateTab('keys')">
+        🔑 4. Virtual API Keys <span class="tab-badge" id="badge-key-count">1</span>
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-combos" onclick="navigateTab('combos')">
+        🧩 5. Model Combos
+      </button>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: 1U MANAGED RACK SWITCH & BALANCING                -->
+    <!-- ======================================================== -->
+    <div class="view-pane active" id="pane-switch">
+      <!-- 1U HARDWARE SWITCH CHASSIS -->
+      <div class="rack-switch-chassis">
+        <!-- Left Rack Mount Ear -->
+        <div class="rack-mount-ear">
+          <div class="chassis-screw"></div>
+          <div class="chassis-screw"></div>
+        </div>
+
+        <!-- Faceplate -->
+        <div class="chassis-faceplate">
+          <!-- Top Status Strip -->
+          <div class="chassis-top-strip">
+            <div class="chassis-brand-group">
+              <div class="chassis-brand-text">GOOGLE <span>AI-SWITCH</span></div>
+              <div class="chassis-model-tag">10GbE / L3 BALANCED ROUTING</div>
+            </div>
+
+            <div class="chassis-sys-leds">
+              <div class="sys-led">
+                <div class="micro-led pwr-green"></div>
+                <span>PWR</span>
+              </div>
+              <div class="sys-led">
+                <div class="micro-led pwr-green"></div>
+                <span>SYS</span>
+              </div>
+              <div class="sys-led">
+                <div class="micro-led rot-cyan" id="sys-rot-led"></div>
+                <span id="sys-rot-text">ROUND-ROBIN</span>
+              </div>
+              <div class="active-port-pill" id="chassis-active-port-pill">
+                ⚡ ROUTING: PORT 4
+              </div>
+            </div>
+          </div>
+
+          <!-- Switch Ports Bay -->
+          <div class="ports-rack-matrix">
+            <!-- SFP+ Fiber Uplink (Client Input) -->
+            <div class="sfp-uplink-bay">
+              <div class="sfp-label">SFP+ UPLINK</div>
+              <div class="sfp-hardware-cage">
+                <div class="fiber-transceiver-optic" id="uplink-optic-led"></div>
+              </div>
+              <div class="sfp-subtext">Hermes / Cursor / Cline</div>
+              <div class="sfp-token-badge" id="sfp-uplink-tokens" title="Tổng lưu lượng Tokens từ dịch vụ thứ 3">
+                <span style="font-size: 0.58rem; color: var(--text-muted); text-transform: uppercase;">3RD PARTY TOKENS</span>
+                <span class="sfp-token-val" id="sfp-token-val">0</span>
+              </div>
+            </div>
+
+            <!-- RJ45 Physical Ports Container -->
+            <div class="rj45-ports-deck" id="rack-ports-container">
+              <div style="color: var(--text-muted); padding: 14px; font-size: 0.85rem;">Đang đồng bộ trạng thái cổng Switch...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Rack Mount Ear -->
+        <div class="rack-mount-ear right">
+          <div class="chassis-screw"></div>
+          <div class="chassis-screw"></div>
+        </div>
+      </div>
+
+      <!-- Strategy Selector Card -->
+      <div class="strategy-card">
+        <div>
+          <div style="font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+            <span>🔄 Chiến Lược Xoay Vòng Cổng Mạng (Port Balancing Mode)</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;" id="strategy-explanation">
+            Luân phiên đều giữa các Cổng mạng (Port) khỏe mạnh. Tự động cô lập cổng 429 và phân tải đều qua các cổng còn lại.
+          </p>
+        </div>
+
+        <div class="strat-btn-group">
+          <button class="strat-choice-btn active" id="strat-btn-round-robin" onclick="selectStrategy('round-robin')">
+            🔄 Round-Robin (Luân phiên)
+          </button>
+          <button class="strat-choice-btn" id="strat-btn-fallback" onclick="selectStrategy('fallback')">
+            ⚡ Auto-Fallback (Tuần tự)
+          </button>
+          <button class="strat-choice-btn" id="strat-btn-fixed" onclick="selectStrategy('fixed')">
+            📌 Cố Định 1 Port
+          </button>
+        </div>
+      </div>
+
+      <!-- Neural AI Routing Topology Card -->
+      <div class="topology-container-card">
+        <div class="topology-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="topology-title-icon">⚡</div>
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700;">Sơ Đồ Mạng Định Tuyến Token (Live Account-to-AI Matrix)</h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                Kiểm tra kết nối thật (Real Health Probe), đo độ trễ ms tới Google và giám sát dòng chảy token thời gian thực
+              </p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button class="btn-action primary" onclick="runPingAllPorts()" id="btn-ping-all" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+              🔍 Ping Kiểm Tra Mạng Thật
+            </button>
+            <div class="topology-status-badge" id="topology-engine-status">
+              <span class="live-blink-dot"></span>
+              <span>AI NEURAL CORE: ONLINE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="topology-stage">
+          <!-- CỘT TRÁI: DANH SÁCH CÁC CỔNG TÀI KHOẢN -->
+          <div class="topo-accounts-col" id="topo-accounts-list">
+            <div style="color: var(--text-muted); font-size: 0.8rem; padding: 12px;">Đang đồng bộ node tài khoản...</div>
+          </div>
+
+          <!-- KHU VỰC GIỮA: DÂY CÁP SVG DYNAMIC -->
+          <div class="topo-cable-canvas-wrap" id="topo-cable-wrap">
+            <svg id="topo-svg-cables">
+              <defs>
+                <linearGradient id="grad-active-cable" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#38bdf8" />
+                  <stop offset="50%" stop-color="#34d399" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+              <g id="svg-paths-group"></g>
+            </svg>
+          </div>
+
+          <!-- CỘT PHẢI: GOOGLE AI NEURAL HUB -->
+          <div class="topo-ai-hub-col">
+            <div class="ai-hub-orb-wrap">
+              <div class="ai-hub-radar-ring"></div>
+              <div class="ai-hub-radar-ring outer"></div>
+              <div class="ai-hub-core-orb">
+                <!-- Google Gemini Multi-Color Star Icon -->
+                <svg class="ai-star-svg" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#ai-star-grad)" />
+                  <defs>
+                    <linearGradient id="ai-star-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#38bdf8" />
+                      <stop offset="50%" stop-color="#818cf8" />
+                      <stop offset="100%" stop-color="#c084fc" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+            <div class="ai-hub-title">GOOGLE AI CORE</div>
+            <div class="ai-hub-subtitle" id="topo-active-model-badge">Gemini 3.8 Flash (Active)</div>
+            
+            <div class="ai-hub-metrics">
+              <div class="ai-metric-item">
+                <span class="m-lbl">Cổng Cấp Quota:</span>
+                <span class="m-val highlight" id="topo-active-account-name">Đang kết nối...</span>
+              </div>
+              <div class="ai-metric-item">
+                <span class="m-lbl">Tổng Tokens AI:</span>
+                <span class="m-val" id="topo-total-ai-tokens">0 Tokens</span>
+              </div>
+              <div class="ai-metric-item">
+                <span class="m-lbl">Trạng Thái Xung:</span>
+                <span class="m-val success">⚡ REALTIME ACTIVE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrated Audit Log Card in Tab 1 -->
+      <div class="chart-container-card" style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <h3 style="font-size: 1.05rem; font-weight: 700;">📜 Nhật Ký Giao Dịch & Tiêu Thụ Token Trực Quan</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">Lịch sử gọi API chi tiết qua từng Cổng Switch (Cursor, Hermes, Cline, Claude Code)</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="tab1-log-search-field" class="input-box" placeholder="Tìm theo model hoặc email..." style="max-width: 240px; padding: 6px 12px; font-size: 0.8rem;" oninput="onSearchTab1Logs()" />
+            <button class="btn-action" onclick="fetchAuditLogs()">🔄 Làm Mới</button>
+            <button class="btn-action danger" onclick="confirmClearLogs()">🗑️ Xóa Nhật Ký</button>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="data-grid-table">
+            <thead>
+              <tr>
+                <th>Thời Gian</th>
+                <th>Cổng Switch (Port)</th>
+                <th>Model</th>
+                <th>Prompt Tokens</th>
+                <th>Completion</th>
+                <th>Tổng Tokens</th>
+                <th>Độ Trễ</th>
+                <th>Mã Trạng Thái</th>
+                <th>Loại Luồng</th>
+              </tr>
+            </thead>
+            <tbody id="tab1-logs-grid-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang đồng bộ nhật ký giao dịch...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: BIỂU ĐỒ TOKEN REALTIME (ANALYTICS)                -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-analytics">
+      <!-- 4 KPI Stat Cards -->
+      <div class="kpi-stats-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Tổng Tokens Tiêu Thụ</div>
+          <div class="kpi-value" id="kpi-total-tokens" style="color: #38bdf8;">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Prompt Tokens (Input)</div>
+          <div class="kpi-value" id="kpi-prompt-tokens" style="color: #60a5fa;">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Completion Tokens (Output)</div>
+          <div class="kpi-value" id="kpi-completion-tokens" style="color: #34d399;">0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tổng Lượt Chuyển Mạch (Requests)</div>
+          <div class="kpi-value" id="kpi-total-reqs" style="color: #e2e8f0;">0</div>
+        </div>
+      </div>
+
+      <!-- Main Timeline Chart -->
+      <div class="chart-container-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h3 style="font-size: 1.05rem; font-weight: 700;">📈 Lưu Lượng Token Theo Thời Gian (Timeline 24h)</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">Phân tách lưu lượng Input vs Output Tokens qua cổng proxy</p>
+          </div>
+          <button class="btn-action" onclick="fetchAnalyticsData()">🔄 Làm Mới</button>
+        </div>
+        <div style="height: 290px; width: 100%;">
+          <canvas id="canvas-timeline-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Breakdown Charts Row -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+        <div class="chart-container-card">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">🧠 Tỷ Trọng Tokens Theo Model</h3>
+          <div style="height: 240px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="canvas-model-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container-card">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">🔌 Tải Tokens Qua Từng Cổng Switch</h3>
+          <div style="height: 240px;">
+            <canvas id="canvas-account-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: AUDIT LOG DATA GRID                               -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-logs">
+      <div class="chart-container-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <h3 style="font-size: 1.05rem; font-weight: 700;">📜 Nhật Ký Token & Giao Dịch Chuyển Mạch (Audit Log)</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">Lịch sử gọi API chi tiết của Hermes Agent, Cursor, Claude Code</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="log-search-field" class="input-box" placeholder="Tìm theo model hoặc email..." style="max-width: 240px; padding: 6px 12px; font-size: 0.8rem;" oninput="onSearchLogs()" />
+            <button class="btn-action" onclick="fetchAuditLogs()">🔄 Làm Mới</button>
+            <button class="btn-action danger" onclick="confirmClearLogs()">🗑️ Xóa Nhật Ký</button>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="data-grid-table">
+            <thead>
+              <tr>
+                <th>Thời Gian</th>
+                <th>Cổng Switch (Port)</th>
+                <th>Model</th>
+                <th>Prompt In</th>
+                <th>Output</th>
+                <th>Tổng Token</th>
+                <th>Độ Trễ</th>
+                <th>Status</th>
+                <th>Stream</th>
+              </tr>
+            </thead>
+            <tbody id="logs-grid-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang tải nhật ký...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: VIRTUAL API KEYS                                  -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-keys">
+      <div class="chart-container-card">
+        <h3 style="font-size: 1.05rem; font-weight: 700;">🔑 Virtual API Keys Cho Bên Thứ 3</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+          Khởi tạo Virtual Key (`sk-switch-...`) an toàn để gán cho từng môi trường (Cursor, Claude Code, Cline, Hermes Agent).
+        </p>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px; max-width: 600px;">
+          <input type="text" id="new-key-label" class="input-box" placeholder="Nhập tên nhãn (vd: Hermes-Macbook, Cursor)..." />
+          <button class="btn-action primary" onclick="submitCreateApiKey()">+ Tạo Key</button>
+        </div>
+
+        <table class="data-grid-table" style="margin-top: 16px;">
+          <thead>
+            <tr>
+              <th>Tên Nhãn</th>
+              <th>API Key</th>
+              <th>Ngày Tạo</th>
+              <th>Lần Dùng Cuối</th>
+              <th>Hành Động</th>
+            </tr>
+          </thead>
+          <tbody id="keys-grid-body">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang tải API Keys...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 5: MODEL COMBOS                                      -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-combos">
+      <div class="chart-container-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.05rem; font-weight: 700; color: #c084fc;">🧩 Tạo Combo Model Thông Minh (Antigravity Pro Suite)</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Mở khóa toàn bộ model cao cấp: Claude 3.7 Sonnet, Gemini 3.8 Flash & Pro, GPT-4o, DeepSeek R1.
+            </p>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button class="btn-action" onclick="applySmartPreset('smart-pro')">👑 Preset: Smart Coder</button>
+            <button class="btn-action" onclick="applySmartPreset('fast-pro')">⚡ Preset: Pro Fast</button>
+            <button class="btn-action" onclick="applySmartPreset('claude')">🧠 Preset: Claude Chain</button>
+          </div>
+        </div>
+
+        <div style="background: rgba(8, 13, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" id="combo-title" class="input-box" style="flex: 1; min-width: 200px;" placeholder="Tên Combo (vd: AI, pro-coder)..." />
+            <select id="combo-mode" class="input-box" style="max-width: 250px;">
+              <option value="fallback">Chiến lược: Fallback (Ưu tiên tuần tự)</option>
+              <option value="round-robin">Chiến lược: Round-Robin (Luân phiên)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; color: #c084fc; margin-bottom: 4px; text-transform: uppercase;">
+                🧠 Anthropic Claude (Pro)
+              </div>
+              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="claude-3-7-sonnet" class="combo-box" checked /> claude-3-7-sonnet
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="claude-3-7-sonnet-thinking" class="combo-box" /> claude-3-7-thinking
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="claude-3-5-sonnet" class="combo-box" /> claude-3-5-sonnet
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; margin-bottom: 4px; text-transform: uppercase;">
+                💎 Google Gemini (Pro & Flash)
+              </div>
+              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="gemini-3.8-flash" class="combo-box" checked /> gemini-3.8-flash (Siêu Tốc)
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="gemini-3.8-pro" class="combo-box" checked /> gemini-3.8-pro
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="gemini-2.5-pro" class="combo-box" /> gemini-2.5-pro
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="gemini-2.5-flash" class="combo-box" /> gemini-2.5-flash
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; color: #10b981; margin-bottom: 4px; text-transform: uppercase;">
+                🤖 OpenAI & DeepSeek Reasoning
+              </div>
+              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="gpt-4o" class="combo-box" /> gpt-4o
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="deepseek-r1" class="combo-box" /> deepseek-r1
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" value="deepseek-v3" class="combo-box" /> deepseek-v3
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 4px;">
+            <button class="btn-action primary" onclick="submitCreateCombo()">+ Lưu Model Combo</button>
+          </div>
+        </div>
+
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin-top: 18px;">Danh Sách Combos Hoạt Động</h4>
+        <div id="combos-grid-deck" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px;">
+          <p style="color: var(--text-muted);">Đang tải Combos...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: ADD PORT / ACCOUNT                                -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="modal-add-port">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          <span>🔌 Cắm Thêm Cổng Mạng Mới Vào Switch</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeAddModal()">&times;</button>
+      </div>
+
+      <div style="display: flex; gap: 6px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+        <button class="btn-action primary" id="tab-modal-oauth" onclick="switchModalTab('oauth')">1. Google OAuth</button>
+        <button class="btn-action" id="tab-modal-key" onclick="switchModalTab('key')">2. Gemini API Key</button>
+        <button class="btn-action" id="tab-modal-token" onclick="switchModalTab('token')">3. Nhập Token</button>
+      </div>
+
+      <!-- Tab OAuth -->
+      <div id="m-pane-oauth" style="text-align: center; padding: 16px 0;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+          Đăng nhập 1-click bằng tài khoản Google của bạn. Switch sẽ tự động lưu và khởi tạo một Cổng RJ45 mới.
+        </p>
+        <button class="btn-add-account" style="margin: 0 auto; padding: 10px 24px; font-size: 0.9rem;" onclick="executeAddOAuth()">
+          Mở Trình Duyệt Đăng Nhập Google
+        </button>
+      </div>
+
+      <!-- Tab Key -->
+      <div id="m-pane-key" style="display: none; flex-direction: column; gap: 10px;">
+        <input type="text" id="m-key-name" class="input-box" placeholder="Tên cổng (vd: gemini-pro-key)..." />
+        <input type="password" id="m-key-value" class="input-box" placeholder="Dán Gemini API Key (AIzaSy...)..." />
+        <button class="btn-action primary" style="align-self: flex-start;" onclick="executeAddApiKey()">Lưu Cổng Mạng</button>
+      </div>
+
+      <!-- Tab Token -->
+      <div id="m-pane-token" style="display: none; flex-direction: column; gap: 10px;">
+        <input type="text" id="m-tok-name" class="input-box" placeholder="Tên cổng..." />
+        <input type="text" id="m-tok-email" class="input-box" placeholder="Email tài khoản..." />
+        <input type="password" id="m-tok-access" class="input-box" placeholder="Access Token (ya29...)..." />
+        <input type="password" id="m-tok-refresh" class="input-box" placeholder="Refresh Token (tùy chọn)..." />
+        <button class="btn-action primary" style="align-self: flex-start;" onclick="executeAddToken()">Lưu Cổng Mạng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-notice">Thông báo</div>
+
+  <script>
+    let activeStrategy = 'round-robin';
+    let cachedLogsData = [];
+    let chartTimelineObj = null;
+    let chartModelObj = null;
+    let chartAccountObj = null;
+
+    function toast(msg, time = 3000) {
+      const el = document.getElementById('toast-notice');
+      el.innerText = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, time);
+    }
+
+    function copyGatewayBaseUrl() {
+      navigator.clipboard.writeText('http://localhost:1909/v1').then(() => {
+        toast('✓ Đã sao chép Base URL: http://localhost:1909/v1');
+      });
+    }
+
+    function copyPlain(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast('✓ Đã sao chép vào Clipboard!');
+      });
+    }
+
+    // --- TAB NAVIGATION ---
+    function navigateTab(tabKey) {
+      document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+
+      const btn = document.getElementById(`tab-btn-${tabKey}`);
+      const pane = document.getElementById(`pane-${tabKey}`);
+      if (btn) btn.classList.add('active');
+      if (pane) pane.classList.add('active');
+
+      if (tabKey === 'switch') setTimeout(() => { if (cachedPorts.length > 0) drawSvgCables(cachedPorts, cachedActiveProfile); }, 60);
+      if (tabKey === 'analytics') fetchAnalyticsData();
+      if (tabKey === 'logs') fetchAuditLogs();
+      if (tabKey === 'keys') fetchApiKeys();
+      if (tabKey === 'combos') fetchCombos();
+    }
+
+    // --- MODAL CONTROLS ---
+    function openAddModal() {
+      document.getElementById('modal-add-port').classList.add('open');
+    }
+    function closeAddModal() {
+      document.getElementById('modal-add-port').classList.remove('open');
+    }
+    function switchModalTab(tabId) {
+      ['oauth', 'key', 'token'].forEach(t => {
+        const pane = document.getElementById(`m-pane-${t}`);
+        const btn = document.getElementById(`tab-modal-${t}`);
+        if (pane) pane.style.display = (t === tabId ? (t === 'oauth' ? 'block' : 'flex') : 'none');
+        if (btn) {
+          if (t === tabId) btn.classList.add('primary');
+          else btn.classList.remove('primary');
+        }
+      });
+    }
+
+    // --- STRATEGY CONTROL ---
+    async function selectStrategy(strat) {
+      try {
+        const res = await fetch('/api/strategy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strategy: strat })
+        });
+        if (res.ok) {
+          toast(`✓ Đã đổi chiến lược: ${strat.toUpperCase()}`);
+          fetchSwitchStatus();
+        }
+      } catch (_) {}
+    }
+
+    function applyStrategyVisual(strat) {
+      activeStrategy = strat || 'round-robin';
+      ['round-robin', 'fallback', 'fixed'].forEach(s => {
+        const btn = document.getElementById(`strat-btn-${s}`);
+        if (btn) {
+          if (s === activeStrategy) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+
+      const led = document.getElementById('sys-rot-led');
+      const text = document.getElementById('sys-rot-text');
+      const expl = document.getElementById('strategy-explanation');
+      if (text) text.innerText = activeStrategy.toUpperCase();
+
+      if (expl) {
+        if (activeStrategy === 'round-robin') {
+          expl.innerText = 'Luân phiên đều giữa các Cổng mạng (Port) khỏe mạnh. Tự động cô lập cổng 429 và phân tải đều qua các cổng còn lại.';
+        } else if (activeStrategy === 'fallback') {
+          expl.innerText = 'Dùng ưu tiên Port 1, chỉ chuyển mạch sang Port 2, 3 khi Port 1 dính lỗi 429 hoặc cạn quota.';
+        } else {
+          expl.innerText = 'Chỉ định tuyến request tới duy nhất 1 Port cố định đang được kích hoạt.';
+        }
+      }
+    }
+
+    function formatTokens(num) {
+      if (!num || num === 0) return '0';
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return Number(num).toLocaleString();
+    }
+
+    let cachedPorts = [];
+    let cachedActiveProfile = null;
+
+    // --- SWITCH ENGINE SYNC ---
+    async function fetchSwitchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        applyStrategyVisual(data.strategy);
+        renderChassisPorts(data.ports || [], data.serving);
+        renderAiTopology(data.ports || [], data.serving);
+
+        // Update 3rd-party SFP+ Uplink tokens
+        const uplinkTokensEl = document.getElementById('sfp-token-val');
+        if (uplinkTokensEl && data.uplink) {
+          uplinkTokensEl.innerText = formatTokens(data.uplink.totalTokens || 0);
+          const badgeEl = document.getElementById('sfp-uplink-tokens');
+          if (badgeEl) {
+            badgeEl.title = `Tổng lưu lượng từ dịch vụ thứ 3: ${Number(data.uplink.totalTokens || 0).toLocaleString()} tokens (${data.uplink.totalRequests || 0} requests)`;
+          }
+        }
+
+        const badgeCount = document.getElementById('badge-port-count');
+        if (badgeCount) badgeCount.innerText = data.ports ? data.ports.length : 0;
+
+        if (data.serving?.account) {
+          const matchPort = (data.ports || []).find(p => p.profile === data.serving.account);
+          const portNumber = matchPort ? matchPort.portNumber : 1;
+          document.getElementById('chassis-active-port-pill').innerText = `⚡ ROUTING: PORT ${portNumber}`;
+        }
+
+        // Dynamically update active model on AI Core Hub
+        const modelBadgeEl = document.getElementById('topo-active-model-badge');
+        if (modelBadgeEl) {
+          if (data.latestModel) {
+            modelBadgeEl.innerText = `${data.latestModel} (Active)`;
+          } else {
+            modelBadgeEl.innerText = 'Gemini 3.8 Flash (Active)';
+          }
+        }
+
+        // Keep audit logs table synchronized
+        fetchAuditLogs();
+      } catch (_) {}
+    }
+
+    function renderChassisPorts(ports, servingData) {
+      const container = document.getElementById('rack-ports-container');
+      if (!ports || ports.length === 0) {
+        container.innerHTML = `<div style="color: var(--text-muted); padding: 14px;">Chưa có cổng mạng nào được kết nối.</div>`;
+        return;
+      }
+
+      container.innerHTML = ports.map(p => {
+        const isLive = p.isServingNow;
+        const linkClass = p.linkStatus === 'up' ? 'lnk-green' :
+                          p.linkStatus === 'cooldown' ? 'lnk-amber' :
+                          p.linkStatus === 'banned' ? 'lnk-red' : 'lnk-off';
+
+        const actClass = isLive ? 'act-pulse' : '';
+        const cardState = isLive ? 'serving-live' :
+                          p.linkStatus === 'banned' ? 'state-banned' :
+                          p.isDisabled ? 'state-down' : '';
+
+        const statusLabel = p.isDisabled ? 'Đã ngắt cáp' :
+                            p.linkStatus === 'banned' ? 'Banned (TOS)' :
+                            p.linkStatus === 'cooldown' ? `Cooldown (${p.cooldownRemainingSeconds}s)` :
+                            isLive ? '⚡ Đang phục vụ' : 'Sẵn sàng';
+
+        return `
+          <div class="rj45-unit-card ${cardState}">
+            <div class="rj45-port-header">
+              <span class="port-id-badge">PORT ${p.portNumber < 10 ? '0' + p.portNumber : p.portNumber}</span>
+              <span class="port-type-tag">${p.type}</span>
+            </div>
+
+            <!-- RJ45 Physical Socket -->
+            <div class="rj45-socket-body">
+              <div class="jack-led-link ${linkClass}" title="Link LED"></div>
+              <div class="jack-led-act ${actClass}" title="Activity LED (TX/RX)"></div>
+              <div class="rj45-gold-pins"></div>
+            </div>
+
+            <div class="port-email-label" title="${p.email}">
+              ${p.email || p.profile}
+            </div>
+
+            <div class="port-stats-row" style="color: #38bdf8; font-size: 0.72rem; font-weight: 600;">
+              <span title="Số token tài khoản này đã phục vụ: ${Number(p.totalTokens || 0).toLocaleString()}">Tokens: <strong>${formatTokens(p.totalTokens || 0)}</strong></span>
+              <span>Req: <strong>${p.totalRequests}</strong></span>
+            </div>
+
+            <div class="port-stats-row">
+              <span style="color: ${p.linkStatus === 'up' ? '#34d399' : p.linkStatus === 'banned' ? '#f87171' : '#fbbf24'};">${statusLabel}</span>
+            </div>
+
+            <div class="mini-switch-row">
+              <span class="mini-switch-text">${p.isDisabled ? 'Off' : 'Active'}</span>
+              <button class="switch-toggle-btn ${p.isDisabled ? '' : 'is-active'}" onclick="toggleSwitchPort('${p.profile}', ${!p.isDisabled})">
+                ${p.isDisabled ? '🔌 Cắm lại' : '⏏ Rút cáp'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- NEURAL AI TOPOLOGY RENDERER (REAL HEALTH & ROUTING) ---
+    let realHealthResults = {};
+
+    function renderAiTopology(ports, servingData) {
+      cachedPorts = ports;
+      const container = document.getElementById('topo-accounts-list');
+      const pathsGroup = document.getElementById('svg-paths-group');
+      if (!container || !pathsGroup) return;
+
+      if (!ports || ports.length === 0) {
+        container.innerHTML = `<div style="color: var(--text-muted); padding: 12px; font-size: 0.8rem;">Chưa có tài khoản nào được kết nối.</div>`;
+        pathsGroup.innerHTML = '';
+        return;
+      }
+
+      // Determine active profile
+      const activePort = ports.find(p => p.isServingNow) ||
+                         (servingData?.account ? ports.find(p => p.profile === servingData.account) : null) ||
+                         ports.find(p => p.isActiveDefault) ||
+                         ports[0];
+      const activeProfile = activePort ? activePort.profile : null;
+      cachedActiveProfile = activeProfile;
+
+      // Render account nodes with Real Health Info
+      container.innerHTML = ports.map((p, idx) => {
+        const isActive = p.profile === activeProfile;
+        const isDown = p.isDisabled;
+        const health = realHealthResults[p.profile];
+        let healthBadgeHtml = '';
+
+        if (health) {
+          const isOk = health.ok;
+          const badgeClass = isOk ? 'lnk-green' : (health.status === 403 ? 'lnk-red' : 'lnk-amber');
+          const statusText = isOk ? `${health.latencyMs}ms (200 OK)` : `${health.message}`;
+          const textColor = isOk ? '#34d399' : '#f87171';
+          healthBadgeHtml = `
+            <div style="font-size: 0.63rem; color: ${textColor}; font-weight: 700; display: flex; align-items: center; gap: 4px; margin-top: 3px;" title="${health.message}">
+              <span class="micro-led ${badgeClass}" style="width: 5px; height: 5px;"></span>
+              <span>${statusText}</span>
+            </div>
+          `;
+        } else {
+          healthBadgeHtml = `
+            <div style="font-size: 0.63rem; color: var(--text-subtle); display: flex; align-items: center; gap: 4px; margin-top: 3px;">
+              <span class="micro-led lnk-off" style="width: 5px; height: 5px;"></span>
+              <span>Chưa kiểm tra (Bấm Ping)</span>
+            </div>
+          `;
+        }
+
+        const nodeClass = isActive ? 'active-routing' : (isDown ? 'node-disabled' : '');
+        const emailShort = (p.email || p.profile).split('@')[0];
+
+        return `
+          <div class="topo-account-node ${nodeClass}" id="topo-node-${idx}">
+            <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; flex: 1;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div class="micro-led ${isActive ? 'pwr-green act-pulse' : (isDown ? 'lnk-off' : 'rot-cyan')}"></div>
+                <div style="font-size: 0.76rem; font-weight: 700; color: #f8fafc; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.email || p.profile}">
+                  P${p.portNumber < 10 ? '0' + p.portNumber : p.portNumber}: ${emailShort}
+                </div>
+              </div>
+              <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">
+                ${p.type.toUpperCase()} • ${formatTokens(p.totalTokens || 0)} tok
+              </div>
+              ${healthBadgeHtml}
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <span class="topo-badge ${isActive ? 'active' : ''}">${isDown ? 'Ngắt cáp' : (isActive ? '⚡ ACTIVE' : 'Standby')}</span>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn-action" style="padding: 2px 6px; font-size: 0.62rem;" onclick="runPingSingle('${p.profile}')" title="Kiểm tra kết nối thực tế tới Google">⚡ Ping</button>
+                <button class="btn-action ${isActive ? 'primary' : ''}" style="padding: 2px 6px; font-size: 0.62rem;" onclick="switchActiveProfile('${p.profile}')" title="Kích hoạt cổng này">Chọn</button>
+              </div>
+            </div>
+            <div class="topo-pin-right ${isActive ? 'active' : ''}" id="topo-pin-${idx}"></div>
+          </div>
+        `;
+      }).join('');
+
+      // Update AI Hub right column info
+      const activeNameEl = document.getElementById('topo-active-account-name');
+      if (activeNameEl && activePort) {
+        activeNameEl.innerText = `Port 0${activePort.portNumber}: ${activePort.email ? activePort.email.split('@')[0] : activePort.profile}`;
+      }
+
+      const totalTokens = ports.reduce((acc, p) => acc + (p.totalTokens || 0), 0);
+      const totalTokensEl = document.getElementById('topo-total-ai-tokens');
+      if (totalTokensEl) {
+        totalTokensEl.innerText = `${formatTokens(totalTokens)} Tokens`;
+      }
+
+      // Draw SVG cables after DOM renders
+      setTimeout(() => {
+        drawSvgCables(ports, activeProfile);
+      }, 50);
+    }
+
+    function drawSvgCables(ports, activeProfile) {
+      const wrap = document.getElementById('topo-cable-wrap');
+      const pathsGroup = document.getElementById('svg-paths-group');
+      if (!wrap || !pathsGroup) return;
+
+      const wrapRect = wrap.getBoundingClientRect();
+      if (wrapRect.width === 0 || wrapRect.height === 0) return;
+
+      const W = wrapRect.width;
+      const H = wrapRect.height;
+      const targetY = H / 2;
+
+      let pathsHtml = '';
+
+      ports.forEach((p, idx) => {
+        const pinEl = document.getElementById(`topo-pin-${idx}`);
+        if (!pinEl) return;
+        const pinRect = pinEl.getBoundingClientRect();
+        const startY = (pinRect.top + pinRect.height / 2) - wrapRect.top;
+        const startX = 0;
+        const endX = W;
+        const endY = targetY;
+
+        const cp1x = W * 0.45;
+        const cp2x = W * 0.55;
+        const d = `M ${startX},${startY} C ${cp1x},${startY} ${cp2x},${endY} ${endX},${endY}`;
+
+        const isActive = p.profile === activeProfile;
+        const isDown = p.isDisabled;
+        const health = realHealthResults[p.profile];
+        const isError = health && !health.ok;
+
+        let pathClass = 'cable-idle';
+        if (isDown) pathClass = 'cable-disabled';
+        else if (isError) pathClass = 'cable-error';
+        else if (isActive) pathClass = 'cable-active';
+
+        pathsHtml += `<path d="${d}" class="${pathClass}" />`;
+      });
+
+      pathsGroup.innerHTML = pathsHtml;
+    }
+
+    async function runPingAllPorts() {
+      const btn = document.getElementById('btn-ping-all');
+      if (btn) btn.innerText = '⏳ Đang Ping Google...';
+      toast('Đang gửi tín hiệu kiểm tra kết nối tới Google Cloud API...');
+
+      try {
+        const res = await fetch('/api/ports/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (data.results) {
+          realHealthResults = data.results;
+          toast('✓ Đã cập nhật kết nối mạng thực tế từ Google!');
+          if (cachedPorts.length > 0) {
+            renderAiTopology(cachedPorts, null);
+          }
+        }
+      } catch (err) {
+        toast(`Lỗi khi ping: ${err.message}`);
+      } finally {
+        if (btn) btn.innerText = '🔍 Ping Toàn Bộ Cổng';
+      }
+    }
+
+    async function runPingSingle(profile) {
+      toast(`Đang ping kiểm tra cổng [${profile}]...`);
+      try {
+        const res = await fetch('/api/ports/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile })
+        });
+        const data = await res.json();
+        if (data.results && data.results[profile]) {
+          realHealthResults[profile] = data.results[profile];
+          const info = data.results[profile];
+          toast(`${info.ok ? '✓' : '✗'} [${profile}]: ${info.message} (${info.latencyMs}ms)`);
+          if (cachedPorts.length > 0) {
+            renderAiTopology(cachedPorts, null);
+          }
+        }
+      } catch (err) {
+        toast(`Lỗi: ${err.message}`);
+      }
+    }
+
+    async function switchActiveProfile(profile) {
+      try {
+        const res = await fetch('/api/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile })
+        });
+        if (res.ok) {
+          toast(`✓ Đã kích hoạt Cổng [${profile}]`);
+          fetchSwitchStatus();
+        }
+      } catch (_) {}
+    }
+
+    // --- BACKUP & RESTORE ---
+    async function downloadBackup() {
+      toast('Đang xuất file sao lưu...');
+      try {
+        const res = await fetch('/api/backup/export');
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `switch-google-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          toast('✓ Đã tải xuống file sao lưu an toàn!');
+        } else {
+          toast('Lỗi khi xuất file backup');
+        }
+      } catch (_) {
+        toast('Lỗi mạng khi xuất backup');
+      }
+    }
+
+    async function handleBackupFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const json = JSON.parse(e.target.result);
+          if (!confirm(`Bạn có chắc chắn muốn phục hồi dữ liệu từ file "${file.name}" không?`)) return;
+          toast('Đang phục hồi dữ liệu...');
+          const res = await fetch('/api/backup/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(json)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            toast(`✓ ${data.message}`);
+            fetchSwitchStatus();
+            fetchApiKeys();
+            fetchAuditLogs();
+          } else {
+            toast(`Lỗi phục hồi: ${data.error}`);
+          }
+        } catch (err) {
+          toast(`File backup không đúng định dạng JSON: ${err.message}`);
+        }
+        event.target.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    window.addEventListener('resize', () => {
+      if (cachedPorts.length > 0) {
+        drawSvgCables(cachedPorts, cachedActiveProfile);
+      }
+    });
+
+    async function toggleSwitchPort(profile, newState) {
+      try {
+        const res = await fetch('/api/ports/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile, disabled: newState })
+        });
+        if (res.ok) {
+          toast(`✓ Đã ${newState ? 'ngắt kết nối' : 'cắm lại cáp'} cổng [${profile}]`);
+          fetchSwitchStatus();
+        }
+      } catch (_) {}
+    }
+
+    // --- ANALYTICS DATA & CHARTS ---
+    async function fetchAnalyticsData() {
+      try {
+        const res = await fetch('/api/usage/stats');
+        const data = await res.json();
+
+        document.getElementById('kpi-total-tokens').innerText = Number(data.totalTokens || 0).toLocaleString();
+        document.getElementById('kpi-prompt-tokens').innerText = Number(data.totalPromptTokens || 0).toLocaleString();
+        document.getElementById('kpi-completion-tokens').innerText = Number(data.totalCompletionTokens || 0).toLocaleString();
+        document.getElementById('kpi-total-reqs').innerText = Number(data.totalRequests || 0).toLocaleString();
+
+        drawTimelineChart(data.timeSeries || []);
+        drawModelDonut(data.tokensByModel || {});
+        drawAccountBar(data.tokensByAccount || {});
+      } catch (_) {}
+    }
+
+    function drawTimelineChart(series) {
+      const ctx = document.getElementById('canvas-timeline-chart').getContext('2d');
+      if (chartTimelineObj) chartTimelineObj.destroy();
+
+      const labels = series.map(s => s.time);
+      const promptValues = series.map(s => s.promptTokens);
+      const completionValues = series.map(s => s.completionTokens);
+
+      const gradPrompt = ctx.createLinearGradient(0, 0, 0, 280);
+      gradPrompt.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+      gradPrompt.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+      const gradComp = ctx.createLinearGradient(0, 0, 0, 280);
+      gradComp.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+      gradComp.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+      chartTimelineObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.length ? labels : ['00:00', '06:00', '12:00', '18:00', '24:00'],
+          datasets: [
+            {
+              label: 'Prompt In',
+              data: promptValues.length ? promptValues : [0, 0, 0, 0, 0],
+              borderColor: '#38bdf8',
+              backgroundColor: gradPrompt,
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 3
+            },
+            {
+              label: 'Output Tokens',
+              data: completionValues.length ? completionValues : [0, 0, 0, 0, 0],
+              borderColor: '#10b981',
+              backgroundColor: gradComp,
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', weight: '600' } } }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } }
+          }
+        }
+      });
+    }
+
+    function drawModelDonut(modelsMap) {
+      const ctx = document.getElementById('canvas-model-chart').getContext('2d');
+      if (chartModelObj) chartModelObj.destroy();
+
+      const labels = Object.keys(modelsMap);
+      const values = Object.values(modelsMap);
+
+      chartModelObj = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length ? labels : ['Chưa có dữ liệu'],
+          datasets: [{
+            data: values.length ? values : [1],
+            backgroundColor: ['#38bdf8', '#c084fc', '#10b981', '#f59e0b', '#f87171'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 10 } }
+          }
+        }
+      });
+    }
+
+    function drawAccountBar(accountsMap) {
+      const ctx = document.getElementById('canvas-account-chart').getContext('2d');
+      if (chartAccountObj) chartAccountObj.destroy();
+
+      const labels = Object.keys(accountsMap).map(a => a.split('@')[0]);
+      const values = Object.values(accountsMap);
+
+      chartAccountObj = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['Port 1'],
+          datasets: [{
+            label: 'Total Tokens',
+            data: values.length ? values : [0],
+            backgroundColor: 'rgba(56, 189, 248, 0.45)',
+            borderColor: '#38bdf8',
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } }
+          }
+        }
+      });
+    }
+
+    // --- AUDIT LOGS ---
+    async function fetchAuditLogs() {
+      try {
+        const res = await fetch('/api/usage/logs?limit=150');
+        const data = await res.json();
+        cachedLogsData = data.logs || [];
+
+        const badgeLog = document.getElementById('badge-log-count');
+        if (badgeLog) badgeLog.innerText = cachedLogsData.length;
+
+        renderAuditTable(cachedLogsData);
+      } catch (_) {}
+    }
+
+    function renderAuditTable(logs) {
+      const tbodies = [
+        document.getElementById('logs-grid-body'),
+        document.getElementById('tab1-logs-grid-body')
+      ].filter(Boolean);
+
+      if (!logs || logs.length === 0) {
+        tbodies.forEach(tb => {
+          tb.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Chưa có lượt giao dịch nào. Hãy gửi prompt qua Hermes hoặc Cursor!</td></tr>`;
+        });
+        return;
+      }
+
+      const rowsHtml = logs.map(l => {
+        const time = new Date(l.timestamp).toLocaleTimeString();
+        const date = new Date(l.timestamp).toLocaleDateString();
+        const lat = l.latencyMs ? `${(l.latencyMs / 1000).toFixed(2)}s` : '--';
+        const latColor = l.latencyMs < 5000 ? '#34d399' : l.latencyMs < 12000 ? '#facc15' : '#f87171';
+        const is200 = l.statusCode === 200;
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 600;">${time}</div>
+              <div style="font-size: 0.7rem; color: var(--text-subtle);">${date}</div>
+            </td>
+            <td>
+              <div style="font-weight: 600; color: #38bdf8;">${l.email || l.profile}</div>
+              <div style="font-size: 0.7rem; color: var(--text-subtle);">${l.virtualKey ? 'Key: ' + l.virtualKey : 'Direct Client'}</div>
+            </td>
+            <td><span class="pill-badge pill-model">${l.model}</span></td>
+            <td style="font-family: var(--font-mono); color: #94a3b8;">${Number(l.promptTokens || 0).toLocaleString()}</td>
+            <td style="font-family: var(--font-mono); color: #34d399;">${Number(l.completionTokens || 0).toLocaleString()}</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; color: #60a5fa;">${Number(l.totalTokens || 0).toLocaleString()}</td>
+            <td style="font-family: var(--font-mono); color: ${latColor};">${lat}</td>
+            <td><span class="pill-badge ${is200 ? 'pill-200' : 'pill-err'}">${l.statusCode}</span></td>
+            <td><span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${l.stream ? 'SSE' : 'Sync'}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      tbodies.forEach(tb => {
+        tb.innerHTML = rowsHtml;
+      });
+    }
+
+    function onSearchLogs() {
+      const q = (document.getElementById('log-search-field')?.value || '').trim().toLowerCase();
+      filterAndRenderLogs(q);
+    }
+
+    function onSearchTab1Logs() {
+      const q = (document.getElementById('tab1-log-search-field')?.value || '').trim().toLowerCase();
+      filterAndRenderLogs(q);
+    }
+
+    function filterAndRenderLogs(q) {
+      if (!q) {
+        renderAuditTable(cachedLogsData);
+        return;
+      }
+      const filtered = cachedLogsData.filter(l => 
+        (l.model && l.model.toLowerCase().includes(q)) ||
+        (l.email && l.email.toLowerCase().includes(q)) ||
+        (l.profile && l.profile.toLowerCase().includes(q))
+      );
+      renderAuditTable(filtered);
+    }
+
+    async function confirmClearLogs() {
+      if (!confirm('Xóa sạch toàn bộ nhật ký token?')) return;
+      try {
+        const res = await fetch('/api/usage/logs', { method: 'DELETE' });
+        if (res.ok) {
+          toast('✓ Đã xóa sạch nhật ký!');
+          fetchAuditLogs();
+          fetchAnalyticsData();
+        }
+      } catch (_) {}
+    }
+
+    // --- VIRTUAL API KEYS ---
+    async function fetchApiKeys() {
+      try {
+        const res = await fetch('/api/keys');
+        const data = await res.json();
+        renderKeysGrid(data.keys || []);
+        const badge = document.getElementById('badge-key-count');
+        if (badge) badge.innerText = data.keys ? data.keys.length : 0;
+      } catch (_) {}
+    }
+
+    function renderKeysGrid(keys) {
+      const tbody = document.getElementById('keys-grid-body');
+      if (!keys || keys.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Chưa tạo API Key nào. Hãy tạo key đầu tiên ở trên!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = keys.map(k => {
+        const last = k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : 'Chưa sử dụng';
+        return `
+          <tr>
+            <td><strong>${k.name}</strong></td>
+            <td>
+              <span style="font-family: var(--font-mono); color: #38bdf8;">${k.key.slice(0, 14)}...${k.key.slice(-6)}</span>
+              <button class="btn-action" style="padding: 2px 7px; font-size: 0.72rem; margin-left: 8px;" onclick="copyPlain('${k.key}')">Copy</button>
+            </td>
+            <td style="color: var(--text-muted); font-size: 0.8rem;">${new Date(k.createdAt).toLocaleDateString()}</td>
+            <td style="color: var(--text-muted); font-size: 0.8rem;">${last}</td>
+            <td>
+              <button class="btn-action danger" style="padding: 4px 8px; font-size: 0.72rem;" onclick="removeApiKey('${k.id}')">Xóa</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function submitCreateApiKey() {
+      const label = document.getElementById('new-key-label').value.trim();
+      if (!label) return toast('Vui lòng nhập tên nhãn cho Key');
+      try {
+        const res = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: label })
+        });
+        if (res.ok) {
+          toast(`✓ Đã tạo Virtual Key [${label}]!`);
+          document.getElementById('new-key-label').value = '';
+          fetchApiKeys();
+        }
+      } catch (_) {}
+    }
+
+    async function removeApiKey(id) {
+      if (!confirm('Xóa API Key này?')) return;
+      try {
+        const res = await fetch(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast('Đã xóa API Key');
+          fetchApiKeys();
+        }
+      } catch (_) {}
+    }
+
+    // --- MODEL COMBOS ---
+    async function fetchCombos() {
+      try {
+        const res = await fetch('/api/combos');
+        const data = await res.json();
+        renderCombosDeck(data.combos || []);
+      } catch (_) {}
+    }
+
+    function renderCombosDeck(combos) {
+      const deck = document.getElementById('combos-grid-deck');
+      if (!combos || combos.length === 0) {
+        deck.innerHTML = `<p style="color: var(--text-muted); grid-column: 1 / -1;">Chưa có Combo nào.</p>`;
+        return;
+      }
+
+      deck.innerHTML = combos.map(c => `
+        <div style="background: rgba(11, 17, 30, 0.85); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #c084fc; font-size: 1rem;">${c.name}</strong>
+            <span class="pill-badge pill-model">${c.strategy.toUpperCase()}</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #93c5fd; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
+            ${c.models.map((m, i) => `${i + 1}. ${m}`).join('<br/>')}
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: auto;">
+            <button class="btn-action" style="flex: 1; padding: 5px;" onclick="copyPlain('${c.name}')">Copy Tên Model</button>
+            <button class="btn-action danger" style="padding: 5px 10px;" onclick="removeCombo('${c.id}')">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function applySmartPreset(presetKey) {
+      const titleInput = document.getElementById('combo-title');
+      const checks = document.querySelectorAll('.combo-box');
+      checks.forEach(c => c.checked = false);
+
+      let targetModels = [];
+      if (presetKey === 'smart-pro') {
+        titleInput.value = 'AI';
+        targetModels = ['gemini-3.8-flash', 'gemini-4-argon-high', 'claude-3-7-sonnet'];
+      } else if (presetKey === 'fast-pro') {
+        titleInput.value = 'pro-fast';
+        targetModels = ['gemini-3.8-flash', 'gemini-2.5-flash'];
+      } else if (presetKey === 'claude') {
+        titleInput.value = 'claude-chain';
+        targetModels = ['claude-3-7-sonnet', 'claude-3-5-sonnet', 'gemini-3.8-flash'];
+      }
+
+      checks.forEach(c => {
+        if (targetModels.includes(c.value)) c.checked = true;
+      });
+      toast(`✓ Đã áp dụng Preset: ${titleInput.value}`);
+    }
+
+    async function submitCreateCombo() {
+      const name = document.getElementById('combo-title').value.trim();
+      const strategy = document.getElementById('combo-mode').value;
+      const checked = Array.from(document.querySelectorAll('.combo-box:checked')).map(el => el.value);
+
+      if (!name || checked.length === 0) return toast('Vui lòng nhập tên và chọn ít nhất 1 model');
+
+      try {
+        const res = await fetch('/api/combos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, strategy, models: checked })
+        });
+        if (res.ok) {
+          toast(`✓ Đã lưu Model Combo [${name}]!`);
+          document.getElementById('combo-title').value = '';
+          fetchCombos();
+        }
+      } catch (_) {}
+    }
+
+    async function removeCombo(id) {
+      if (!confirm('Xóa Model Combo này?')) return;
+      try {
+        const res = await fetch(`/api/combos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast('Đã xóa Combo');
+          fetchCombos();
+        }
+      } catch (_) {}
+    }
+
+    // --- ADD PORT HANDLERS (MODAL) ---
+    async function executeAddOAuth() {
+      toast('Đang mở trình duyệt đăng nhập Google...', 5000);
+      try {
+        const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        if (res.ok) {
+          const data = await res.json();
+          toast(`✓ Đăng nhập thành công cổng [${data.email}]!`);
+          closeAddModal();
+          fetchSwitchStatus();
+        } else {
+          const data = await res.json();
+          toast(`Lỗi: ${data.error}`);
+        }
+      } catch (_) {}
+    }
+
+    async function executeAddApiKey() {
+      const name = document.getElementById('m-key-name').value.trim();
+      const key = document.getElementById('m-key-value').value.trim();
+      if (!name || !key) return toast('Vui lòng nhập đầy đủ tên và API Key');
+
+      try {
+        const res = await fetch('/api/profiles/apikey', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: name, apiKey: key })
+        });
+        if (res.ok) {
+          toast(`✓ Đã thêm Cổng API Key thành công!`);
+          document.getElementById('m-key-name').value = '';
+          document.getElementById('m-key-value').value = '';
+          closeAddModal();
+          fetchSwitchStatus();
+        }
+      } catch (_) {}
+    }
+
+    async function executeAddToken() {
+      const name = document.getElementById('m-tok-name').value.trim();
+      const email = document.getElementById('m-tok-email').value.trim();
+      const accessToken = document.getElementById('m-tok-access').value.trim();
+      const refreshToken = document.getElementById('m-tok-refresh').value.trim();
+      if (!name || !accessToken) return toast('Vui lòng nhập tên và Access Token');
+
+      try {
+        const res = await fetch('/api/profiles/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: name, email, accessToken, refreshToken })
+        });
+        if (res.ok) {
+          toast(`✓ Đã lưu Cổng Token thành công!`);
+          closeAddModal();
+          fetchSwitchStatus();
+        }
+      } catch (_) {}
+    }
+
+    // Initial Sync & Realtime Polling (every 2.5s)
+    fetchSwitchStatus();
+    setInterval(fetchSwitchStatus, 2500);
+  </script>
+</body>
+</html>
