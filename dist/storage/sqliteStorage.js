@@ -244,13 +244,28 @@ class SqliteStorage {
     db;
     dbPath;
     baseDir;
-    isNativeSqlite;
+    isNativeSqlite = true;
     constructor(customBaseDir) {
-        this.baseDir = customBaseDir || path_1.default.join(os_1.default.homedir(), '.switch-google');
+        const isTest = Boolean(process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === 'test');
+        if (!customBaseDir && isTest) {
+            this.baseDir = path_1.default.join(os_1.default.tmpdir(), 'switch-google-test-isolated');
+        }
+        else {
+            this.baseDir = customBaseDir || path_1.default.join(os_1.default.homedir(), '.switch-google');
+        }
         if (!fs_1.default.existsSync(this.baseDir)) {
             fs_1.default.mkdirSync(this.baseDir, { recursive: true, mode: 0o700 });
         }
         this.dbPath = path_1.default.join(this.baseDir, 'switch_google.sqlite');
+        this.reinitializeDatabase();
+    }
+    reinitializeDatabase() {
+        try {
+            if (this.db) {
+                this.db.close();
+            }
+        }
+        catch (_) { }
         let fallbackDataToMigrate = null;
         if (DatabaseSyncClass) {
             // Kiểm tra file hiện tại có phải là SQLite binary thật sự không
@@ -310,61 +325,76 @@ class SqliteStorage {
         this.initTables();
         // Nếu có dữ liệu từ Fallback JSON cần migrate sang Native SQLite
         if (fallbackDataToMigrate && this.isNativeSqlite) {
-            try {
-                if (fallbackDataToMigrate.profiles) {
-                    for (const p of Object.values(fallbackDataToMigrate.profiles)) {
-                        const tokens = typeof p.tokens === 'object' && p.tokens !== null
-                            ? p.tokens
-                            : (p.tokens_json ? JSON.parse(p.tokens_json) : {});
-                        this.saveProfile({
-                            name: p.name,
-                            email: p.email || p.name,
-                            type: p.type || 'oauth',
-                            apiKey: p.api_key || p.apiKey || undefined,
-                            cookies: p.cookies || undefined,
-                            tokens,
-                            createdAt: p.created_at || p.createdAt || Date.now(),
-                            updatedAt: p.updated_at || p.updatedAt || Date.now()
-                        });
-                    }
-                }
-                if (fallbackDataToMigrate.virtual_keys) {
-                    for (const k of Object.values(fallbackDataToMigrate.virtual_keys)) {
-                        this.saveApiKey({
-                            id: k.id,
-                            name: k.name,
-                            key: k.key,
-                            createdAt: k.created_at || k.createdAt || Date.now(),
-                            lastUsedAt: k.last_used_at || k.lastUsedAt || undefined
-                        });
-                    }
-                }
-                if (fallbackDataToMigrate.model_combos) {
-                    for (const c of Object.values(fallbackDataToMigrate.model_combos)) {
-                        const models = typeof c.models_json === 'string'
-                            ? JSON.parse(c.models_json)
-                            : (Array.isArray(c.models) ? c.models : []);
-                        this.saveCombo({
-                            id: c.id,
-                            name: c.name,
-                            strategy: c.strategy || 'fallback',
-                            models,
-                            createdAt: c.created_at || c.createdAt || Date.now()
-                        });
-                    }
-                }
-                if (fallbackDataToMigrate.settings) {
-                    for (const [key, val] of Object.entries(fallbackDataToMigrate.settings)) {
-                        this.setSetting(key, String(val));
-                    }
-                }
-                console.log('[SQLite] Đã tự động khôi phục và chuyển đổi toàn bộ dữ liệu từ Fallback JSON sang SQLite binary thành công!');
-            }
-            catch (migErr) {
-                console.error('[SQLite] Lỗi khi chuyển đổi dữ liệu từ Fallback JSON:', migErr);
-            }
+            this.importFallbackData(fallbackDataToMigrate);
         }
         this.migrateFromLegacyIfNeeded();
+    }
+    importFallbackData(fallbackDataToMigrate) {
+        try {
+            if (fallbackDataToMigrate.profiles) {
+                for (const p of Object.values(fallbackDataToMigrate.profiles)) {
+                    const tokens = typeof p.tokens === 'object' && p.tokens !== null
+                        ? p.tokens
+                        : (p.tokens_json ? JSON.parse(p.tokens_json) : {});
+                    this.saveProfile({
+                        name: p.name,
+                        email: p.email || p.name,
+                        type: p.type || 'oauth',
+                        apiKey: p.api_key || p.apiKey || undefined,
+                        cookies: p.cookies || undefined,
+                        tokens,
+                        createdAt: p.created_at || p.createdAt || Date.now(),
+                        updatedAt: p.updated_at || p.updatedAt || Date.now()
+                    });
+                }
+            }
+            if (fallbackDataToMigrate.virtual_keys) {
+                for (const k of Object.values(fallbackDataToMigrate.virtual_keys)) {
+                    this.saveApiKey({
+                        id: k.id,
+                        name: k.name,
+                        key: k.key,
+                        createdAt: k.created_at || k.createdAt || Date.now(),
+                        lastUsedAt: k.last_used_at || k.lastUsedAt || undefined
+                    });
+                }
+            }
+            if (fallbackDataToMigrate.model_combos) {
+                for (const c of Object.values(fallbackDataToMigrate.model_combos)) {
+                    const models = typeof c.models_json === 'string'
+                        ? JSON.parse(c.models_json)
+                        : (Array.isArray(c.models) ? c.models : []);
+                    this.saveCombo({
+                        id: c.id,
+                        name: c.name,
+                        strategy: c.strategy || 'fallback',
+                        models,
+                        createdAt: c.created_at || c.createdAt || Date.now()
+                    });
+                }
+            }
+            if (fallbackDataToMigrate.settings) {
+                for (const [key, val] of Object.entries(fallbackDataToMigrate.settings)) {
+                    this.setSetting(key, String(val));
+                }
+            }
+            console.log('[SQLite] Đã tự động khôi phục và chuyển đổi toàn bộ dữ liệu từ Fallback JSON sang SQLite binary thành công!');
+        }
+        catch (migErr) {
+            console.error('[SQLite] Lỗi khi chuyển đổi dữ liệu từ Fallback JSON:', migErr);
+        }
+    }
+    ensureValidDb() {
+        try {
+            this.db.prepare('SELECT 1').get();
+        }
+        catch (e) {
+            const msg = String(e?.message || '');
+            if (msg.includes('not a database') || msg.includes('corrupt') || msg.includes('closed') || msg.includes('no such table')) {
+                console.warn('[SQLite] Đang tự động kết nối lại và chữa lành cơ sở dữ liệu:', msg);
+                this.reinitializeDatabase();
+            }
+        }
     }
     static getInstance(customBaseDir) {
         if (customBaseDir) {
@@ -514,11 +544,23 @@ class SqliteStorage {
     }
     // Settings
     getSetting(key, defaultValue = '') {
-        const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-        return row ? row.value : defaultValue;
+        this.ensureValidDb();
+        try {
+            const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+            return row ? row.value : defaultValue;
+        }
+        catch (_) {
+            return defaultValue;
+        }
     }
     setSetting(key, value) {
-        this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
+        this.ensureValidDb();
+        try {
+            this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
+        }
+        catch (err) {
+            console.error('[SQLite] Lỗi setSetting:', err);
+        }
     }
     getRotationConfig() {
         const reqStr = this.getSetting('rotation_requests_per_turn', '1');
@@ -543,32 +585,79 @@ class SqliteStorage {
     }
     // Profiles
     getAllProfiles() {
-        const rows = this.db.prepare('SELECT * FROM profiles ORDER BY name ASC').all();
-        return rows.map((r) => ({
-            name: r.name,
-            email: r.email,
-            type: r.type,
-            apiKey: r.api_key || undefined,
-            cookies: r.cookies || undefined,
-            tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
-            createdAt: r.created_at,
-            updatedAt: r.updated_at
-        }));
+        this.ensureValidDb();
+        try {
+            const rows = this.db.prepare('SELECT * FROM profiles ORDER BY name ASC').all();
+            return rows.map((r) => ({
+                name: r.name,
+                email: r.email,
+                type: r.type,
+                apiKey: r.api_key || undefined,
+                cookies: r.cookies || undefined,
+                tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
+                createdAt: r.created_at,
+                updatedAt: r.updated_at
+            }));
+        }
+        catch (err) {
+            console.error('[SQLite] Lỗi getAllProfiles, tự động phục hồi kết nối:', err);
+            this.reinitializeDatabase();
+            try {
+                const rows = this.db.prepare('SELECT * FROM profiles ORDER BY name ASC').all();
+                return rows.map((r) => ({
+                    name: r.name,
+                    email: r.email,
+                    type: r.type,
+                    apiKey: r.api_key || undefined,
+                    cookies: r.cookies || undefined,
+                    tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at
+                }));
+            }
+            catch (_) {
+                return [];
+            }
+        }
     }
     getProfile(name) {
-        const r = this.db.prepare('SELECT * FROM profiles WHERE name = ?').get(name);
-        if (!r)
-            return null;
-        return {
-            name: r.name,
-            email: r.email,
-            type: r.type,
-            apiKey: r.api_key || undefined,
-            cookies: r.cookies || undefined,
-            tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
-            createdAt: r.created_at,
-            updatedAt: r.updated_at
-        };
+        this.ensureValidDb();
+        try {
+            const r = this.db.prepare('SELECT * FROM profiles WHERE name = ?').get(name);
+            if (!r)
+                return null;
+            return {
+                name: r.name,
+                email: r.email,
+                type: r.type,
+                apiKey: r.api_key || undefined,
+                cookies: r.cookies || undefined,
+                tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
+                createdAt: r.created_at,
+                updatedAt: r.updated_at
+            };
+        }
+        catch (_) {
+            this.reinitializeDatabase();
+            try {
+                const r = this.db.prepare('SELECT * FROM profiles WHERE name = ?').get(name);
+                if (!r)
+                    return null;
+                return {
+                    name: r.name,
+                    email: r.email,
+                    type: r.type,
+                    apiKey: r.api_key || undefined,
+                    cookies: r.cookies || undefined,
+                    tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at
+                };
+            }
+            catch (_) {
+                return null;
+            }
+        }
     }
     saveProfile(profile) {
         try {
@@ -738,23 +827,51 @@ class SqliteStorage {
         return entry;
     }
     getUsageLogs(limit = 100) {
-        const rows = this.db.prepare(`
-      SELECT * FROM usage_logs ORDER BY timestamp DESC LIMIT ?
-    `).all(limit);
-        return rows.map((r) => ({
-            id: r.id,
-            timestamp: r.timestamp,
-            profile: r.profile,
-            email: r.email,
-            model: r.model,
-            virtualKey: r.virtual_key,
-            promptTokens: r.prompt_tokens,
-            completionTokens: r.completion_tokens,
-            totalTokens: r.total_tokens,
-            latencyMs: r.latency_ms,
-            statusCode: r.status_code,
-            stream: Boolean(r.stream)
-        }));
+        this.ensureValidDb();
+        try {
+            const rows = this.db.prepare(`
+        SELECT * FROM usage_logs ORDER BY timestamp DESC LIMIT ?
+      `).all(limit);
+            return rows.map((r) => ({
+                id: r.id,
+                timestamp: r.timestamp,
+                profile: r.profile,
+                email: r.email,
+                model: r.model,
+                virtualKey: r.virtual_key,
+                promptTokens: r.prompt_tokens,
+                completionTokens: r.completion_tokens,
+                totalTokens: r.total_tokens,
+                latencyMs: r.latency_ms,
+                statusCode: r.status_code,
+                stream: Boolean(r.stream)
+            }));
+        }
+        catch (_) {
+            this.reinitializeDatabase();
+            try {
+                const rows = this.db.prepare(`
+          SELECT * FROM usage_logs ORDER BY timestamp DESC LIMIT ?
+        `).all(limit);
+                return rows.map((r) => ({
+                    id: r.id,
+                    timestamp: r.timestamp,
+                    profile: r.profile,
+                    email: r.email,
+                    model: r.model,
+                    virtualKey: r.virtual_key,
+                    promptTokens: r.prompt_tokens,
+                    completionTokens: r.completion_tokens,
+                    totalTokens: r.total_tokens,
+                    latencyMs: r.latency_ms,
+                    statusCode: r.status_code,
+                    stream: Boolean(r.stream)
+                }));
+            }
+            catch (_) {
+                return [];
+            }
+        }
     }
     getUsageStats(timeframeMs) {
         const cutoff = timeframeMs ? Date.now() - timeframeMs : 0;

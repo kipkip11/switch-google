@@ -239,4 +239,19 @@ export class UsageTracker {
   }
 }
 
-export const usageTracker = UsageTracker.getInstance();
+let _trackerInstance: UsageTracker | null = null;
+export function getUsageTracker(): UsageTracker {
+  if (!_trackerInstance) {
+    _trackerInstance = UsageTracker.getInstance();
+  }
+  return _trackerInstance;
+}
+
+// Lazy Proxy tương thích ngược: Chỉ khởi tạo khi được gọi hàm thật sự, không mở SQLite khi chỉ import module
+export const usageTracker: UsageTracker = new Proxy({} as UsageTracker, {
+  get(_target, prop) {
+    const inst = getUsageTracker() as any;
+    const val = inst[prop];
+    return typeof val === 'function' ? val.bind(inst) : val;
+  }
+});

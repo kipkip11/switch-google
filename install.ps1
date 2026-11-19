@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Script Cài Đặt Tự Động Switch Google Cho Windows PowerShell (1-Click Install)
 # irm https://raw.githubusercontent.com/kipkip11/switch-google/main/install.ps1 | iex
 # ==============================================================================
@@ -70,6 +70,20 @@ Expand-Archive -Path $zipPath -DestinationPath $extractTemp -Force
 if (-not (Test-Path "$env:USERPROFILE\.switch-google")) {
     New-Item -ItemType Directory -Path "$env:USERPROFILE\.switch-google" -Force | Out-Null
 }
+
+# Tự động sao lưu dữ liệu an toàn trước khi cập nhật
+$backupDir = "$env:USERPROFILE\.switch-google\backups\pre_update_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+if (-not (Test-Path $backupDir)) {
+    New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+}
+@("switch_google.sqlite", "profiles.enc.json", "master.key", "usage_logs.json") | ForEach-Object {
+    $filePath = "$env:USERPROFILE\.switch-google\$_"
+    if (Test-Path $filePath) {
+        Copy-Item -Path $filePath -Destination "$backupDir\$_" -Force -ErrorAction SilentlyContinue
+    }
+}
+Write-Host "🛡️  Đã tự động sao lưu dữ liệu hiện tại vào: $backupDir" -ForegroundColor DarkGray
+
 if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }

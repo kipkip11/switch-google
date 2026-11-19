@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.usageTracker = exports.UsageTracker = void 0;
+exports.getUsageTracker = getUsageTracker;
 const sqliteStorage_1 = require("../storage/sqliteStorage");
 class UsageTracker {
     static instance;
@@ -169,4 +170,18 @@ class UsageTracker {
     }
 }
 exports.UsageTracker = UsageTracker;
-exports.usageTracker = UsageTracker.getInstance();
+let _trackerInstance = null;
+function getUsageTracker() {
+    if (!_trackerInstance) {
+        _trackerInstance = UsageTracker.getInstance();
+    }
+    return _trackerInstance;
+}
+// Lazy Proxy tương thích ngược: Chỉ khởi tạo khi được gọi hàm thật sự, không mở SQLite khi chỉ import module
+exports.usageTracker = new Proxy({}, {
+    get(_target, prop) {
+        const inst = getUsageTracker();
+        const val = inst[prop];
+        return typeof val === 'function' ? val.bind(inst) : val;
+    }
+});

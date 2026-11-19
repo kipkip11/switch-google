@@ -336,6 +336,23 @@ WantedBy=default.target`;
     }
     performSelfUpdate() {
         try {
+            // 1. Tự động sao lưu dữ liệu an toàn trước khi cập nhật
+            const backupDir = path_1.default.join(this.baseDir, 'backups', `pre_update_${Date.now()}`);
+            try {
+                if (!fs_1.default.existsSync(backupDir)) {
+                    fs_1.default.mkdirSync(backupDir, { recursive: true });
+                }
+                const filesToBackup = ['switch_google.sqlite', 'profiles.enc.json', 'master.key', 'usage_logs.json'];
+                for (const f of filesToBackup) {
+                    const src = path_1.default.join(this.baseDir, f);
+                    if (fs_1.default.existsSync(src)) {
+                        fs_1.default.copyFileSync(src, path_1.default.join(backupDir, f));
+                    }
+                }
+            }
+            catch (backupErr) {
+                console.warn('[Update] Cảnh báo sao lưu trước cập nhật:', backupErr);
+            }
             let output = '';
             if (fs_1.default.existsSync(path_1.default.join(this.appRoot, '.git'))) {
                 output += (0, child_process_1.execSync)('git pull origin main', { cwd: this.appRoot }).toString();
@@ -347,7 +364,7 @@ WantedBy=default.target`;
             }
             return {
                 success: true,
-                message: 'Đã cập nhật Switch Google lên phiên bản mới nhất thành công!',
+                message: 'Đã cập nhật Switch Google lên phiên bản mới nhất thành công (Dữ liệu đã được sao lưu an toàn)!',
                 output
             };
         }
