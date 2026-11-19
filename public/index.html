@@ -466,7 +466,7 @@
     /* RJ45 Ports Flex Container */
     .rj45-ports-deck {
       display: flex;
-      gap: 12px;
+      gap: 8px;
       flex: 1;
       flex-wrap: wrap;
     }
@@ -474,14 +474,14 @@
     .rj45-unit-card {
       background: rgba(11, 17, 30, 0.9);
       border: 1px solid #233045;
-      border-radius: 10px;
-      padding: 10px 12px;
+      border-radius: 8px;
+      padding: 8px 10px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      min-width: 148px;
+      gap: 6px;
+      min-width: 136px;
       flex: 1;
-      max-width: 210px;
+      max-width: 195px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
     }
@@ -911,8 +911,8 @@
     .topo-accounts-col {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      width: 285px;
+      gap: 6px;
+      width: 335px;
       z-index: 2;
       flex-shrink: 0;
     }
@@ -926,13 +926,15 @@
     .topo-account-node {
       background: rgba(16, 23, 38, 0.85);
       border: 1px solid #233045;
-      border-radius: 8px;
-      padding: 8px 12px;
+      border-radius: 7px;
+      padding: 6px 10px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 4px;
+      justify-content: center;
       transition: all 0.25s ease;
       position: relative;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
     }
     .topo-account-node:hover {
       border-color: #38bdf8;
@@ -952,8 +954,8 @@
       right: -5px;
       top: 50%;
       transform: translateY(-50%);
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #475569;
       border: 1.5px solid #0f172a;
@@ -2244,21 +2246,18 @@
 
         if (health) {
           const isOk = health.ok;
-          const badgeClass = isOk ? 'lnk-green' : (health.status === 403 ? 'lnk-red' : 'lnk-amber');
-          const statusText = isOk ? `${health.latencyMs}ms (200 OK)` : `${health.message}`;
+          const statusText = isOk ? `${health.latencyMs}ms` : 'Lỗi';
           const textColor = isOk ? '#34d399' : '#f87171';
           healthBadgeHtml = `
-            <div style="font-size: 0.63rem; color: ${textColor}; font-weight: 700; display: flex; align-items: center; gap: 4px; margin-top: 3px;" title="${health.message}">
-              <span class="micro-led ${badgeClass}" style="width: 5px; height: 5px;"></span>
-              <span>${statusText}</span>
-            </div>
+            <span style="color: ${textColor}; font-weight: 600;" title="${health.message || (isOk ? '200 OK' : 'Lỗi kết nối')}">
+              ● ${statusText}
+            </span>
           `;
         } else {
           healthBadgeHtml = `
-            <div style="font-size: 0.63rem; color: var(--text-subtle); display: flex; align-items: center; gap: 4px; margin-top: 3px;">
-              <span class="micro-led lnk-off" style="width: 5px; height: 5px;"></span>
-              <span>Chưa kiểm tra (Bấm Ping)</span>
-            </div>
+            <span style="color: var(--text-subtle);" title="Chưa kiểm tra (Bấm Ping)">
+              ● Chưa ping
+            </span>
           `;
         }
 
@@ -2267,33 +2266,43 @@
 
         return `
           <div class="topo-account-node ${nodeClass}" id="topo-node-${idx}">
-            <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; flex: 1;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <div class="micro-led ${isActive ? 'pwr-green act-pulse' : (isDown ? 'lnk-off' : 'rot-cyan')}"></div>
-                <div style="font-size: 0.76rem; font-weight: 700; color: #f8fafc; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.email || p.profile}">
+            <!-- Dòng 1: Header (Mã Port, Tên tài khoản, Loại & Badge Active) -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 5px; overflow: hidden; flex: 1;">
+                <div class="micro-led ${isActive ? 'pwr-green act-pulse' : (isDown ? 'lnk-off' : 'rot-cyan')}" style="width: 5px; height: 5px; flex-shrink: 0;"></div>
+                <div style="font-size: 0.74rem; font-weight: 700; color: #f8fafc; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.email || p.profile}">
                   P${p.portNumber < 10 ? '0' + p.portNumber : p.portNumber}: ${emailShort}
                 </div>
+                <span class="port-type-tag" style="font-size: 0.55rem; padding: 1px 4px; text-transform: uppercase; border-radius: 3px;">${p.type}</span>
               </div>
-              <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">
-                ${p.type.toUpperCase()} • ${formatTokens(p.totalTokens || 0)} tok
-              </div>
-              ${p.isBlockedAntigravity && p.type === 'oauth' ? `
-                <div style="font-size: 0.63rem; color: #f87171; font-weight: 700; margin-top: 2px;">⚠️ Bị Chặn Antigravity</div>
-              ` : ''}
-              ${healthBadgeHtml}
+              <span class="topo-badge ${isActive ? 'active' : ''}" style="font-size: 0.58rem; padding: 1px 5px; flex-shrink: 0;">
+                ${isDown ? 'Off' : (isActive ? '⚡ ACTIVE' : 'Standby')}
+              </span>
             </div>
 
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-              <span class="topo-badge ${isActive ? 'active' : ''}">${isDown ? 'Ngắt cáp' : (isActive ? '⚡ ACTIVE' : 'Standby')}</span>
-              <div style="display: flex; gap: 4px;">
+            <!-- Dòng 2: Thông số & Action Toolbar -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; font-size: 0.62rem;">
+              <div style="display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; white-space: nowrap;">
+                <span>${formatTokens(p.totalTokens || 0)} tok</span>
+                <span style="color: #475569;">•</span>
+                ${healthBadgeHtml}
                 ${p.isBlockedAntigravity && p.type === 'oauth' ? `
-                  <button class="btn-action primary" style="padding: 2px 6px; font-size: 0.62rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); font-weight: 700;" onclick="upgradeToWebMode('${p.profile}')" title="Kích hoạt Chrome tự động lấy Cookie để vượt chặn Antigravity">⚡ Web Mode</button>
+                  <span style="color: #f87171; font-weight: 700; background: rgba(239, 68, 68, 0.15); padding: 1px 4px; border-radius: 3px; font-size: 0.55rem;" title="Bị Google chặn CloudCode/Antigravity API">⚠️ Chặn</span>
                 ` : ''}
-                <button class="btn-action" style="padding: 2px 6px; font-size: 0.62rem;" onclick="runPingSingle('${p.profile}')" title="Kiểm tra kết nối thực tế tới Google">⚡ Ping</button>
-                <button class="btn-action ${isActive ? 'primary' : ''}" style="padding: 2px 6px; font-size: 0.62rem;" onclick="switchActiveProfile('${p.profile}')" title="Kích hoạt cổng này">Chọn</button>
-                <button class="btn-action danger" style="padding: 2px 6px; font-size: 0.62rem;" onclick="deleteAccount('${p.profile}')" title="Xóa tài khoản này khỏi hệ thống">🗑️</button>
+              </div>
+
+              <div style="display: flex; gap: 3px; align-items: center; flex-shrink: 0;">
+                ${p.isBlockedAntigravity && p.type === 'oauth' ? `
+                  <button class="btn-action primary" style="padding: 1px 5px; font-size: 0.58rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); font-weight: 700; border-radius: 3px;" onclick="upgradeToWebMode('${p.profile}')" title="Chuyển sang Gemini Web Mode">⚡ Web</button>
+                ` : ''}
+                <button class="btn-action" style="padding: 1px 5px; font-size: 0.58rem; border-radius: 3px;" onclick="runPingSingle('${p.profile}')" title="Kiểm tra kết nối thực tế tới Google">Ping</button>
+                ${!isActive ? `
+                  <button class="btn-action" style="padding: 1px 5px; font-size: 0.58rem; border-radius: 3px;" onclick="switchActiveProfile('${p.profile}')" title="Kích hoạt cổng này">Chọn</button>
+                ` : ''}
+                <button class="btn-action danger" style="padding: 1px 4px; font-size: 0.58rem; border-radius: 3px;" onclick="deleteAccount('${p.profile}')" title="Xóa tài khoản này khỏi hệ thống">🗑️</button>
               </div>
             </div>
+
             <div class="topo-pin-right ${isActive ? 'active' : ''}" id="topo-pin-${idx}"></div>
           </div>
         `;
