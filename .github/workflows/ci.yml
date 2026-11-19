@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x, 22.x]
+        node-version: [20.x, 22.x, 24.x]
 
     steps:
       - name: Checkout repository
@@ -32,8 +32,11 @@ jobs:
       - name: Type Check (TypeScript Verification)
         run: npm run type-check
 
-      - name: Run Unit Tests with Coverage
+      - name: Run Unit Tests with Coverage (Native Engine)
         run: npm test -- --coverage
+
+      - name: Run Unit Tests with Coverage (Forced Fallback Engine)
+        run: TEST_FALLBACK_SQLITE=1 npm test
 
       - name: Build Project
         run: npm run build

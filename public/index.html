@@ -1704,6 +1704,46 @@
           </div>
         </div>
       </div>
+
+      <!-- BẢNG LỊCH SỬ SỬ DỤNG TOKEN REALTIME CHI TIẾT -->
+      <div class="chart-container-card" style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <h3 style="font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span>📜</span>
+              <span>Lịch Sử Tiêu Thụ Token & Giao Dịch Realtime</span>
+              <span class="tab-badge" id="badge-log-count-tab2" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">0</span>
+            </h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">Theo dõi realtime từng lượt gọi qua Hermes Agent, Cursor, Cline: Model, Prompt Tokens, Completion Tokens, Độ trễ</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="tab2-log-search-field" class="input-box" placeholder="Tìm theo model hoặc email..." style="max-width: 240px; padding: 6px 12px; font-size: 0.8rem;" oninput="onSearchTab2Logs()" />
+            <button class="btn-action" onclick="fetchAuditLogs()">🔄 Làm Mới</button>
+            <button class="btn-action danger" onclick="confirmClearLogs()">🗑️ Xóa Nhật Ký</button>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="data-grid-table">
+            <thead>
+              <tr>
+                <th>Thời Gian</th>
+                <th>Cổng Switch (Port)</th>
+                <th>Model</th>
+                <th>Prompt Tokens</th>
+                <th>Completion</th>
+                <th>Tổng Tokens</th>
+                <th>Độ Trễ</th>
+                <th>Mã Trạng Thái</th>
+                <th>Loại Luồng</th>
+              </tr>
+            </thead>
+            <tbody id="tab2-logs-grid-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang đồng bộ nhật ký giao dịch token...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ======================================================== -->
@@ -1922,7 +1962,9 @@
     }
 
     // --- TAB NAVIGATION ---
+    let currentActiveTab = 'switch';
     function navigateTab(tabKey) {
+      currentActiveTab = tabKey;
       document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
 
@@ -1931,8 +1973,14 @@
       if (btn) btn.classList.add('active');
       if (pane) pane.classList.add('active');
 
-      if (tabKey === 'switch') setTimeout(() => { if (cachedPorts.length > 0) drawSvgCables(cachedPorts, cachedActiveProfile); }, 60);
-      if (tabKey === 'analytics') fetchAnalyticsData();
+      if (tabKey === 'switch') {
+        setTimeout(() => { if (cachedPorts.length > 0) drawSvgCables(cachedPorts, cachedActiveProfile); }, 60);
+        fetchAuditLogs();
+      }
+      if (tabKey === 'analytics') {
+        fetchAnalyticsData();
+        fetchAuditLogs();
+      }
       if (tabKey === 'keys') fetchApiKeys();
       if (tabKey === 'combos') fetchCombos();
     }
@@ -2721,6 +2769,8 @@
 
         const badgeLog = document.getElementById('badge-log-count');
         if (badgeLog) badgeLog.innerText = cachedLogsData.length;
+        const badgeLogTab2 = document.getElementById('badge-log-count-tab2');
+        if (badgeLogTab2) badgeLogTab2.innerText = cachedLogsData.length;
 
         renderAuditTable(cachedLogsData);
       } catch (_) {}
@@ -2729,7 +2779,8 @@
     function renderAuditTable(logs) {
       const tbodies = [
         document.getElementById('logs-grid-body'),
-        document.getElementById('tab1-logs-grid-body')
+        document.getElementById('tab1-logs-grid-body'),
+        document.getElementById('tab2-logs-grid-body')
       ].filter(Boolean);
 
       if (!logs || logs.length === 0) {
@@ -2779,6 +2830,11 @@
 
     function onSearchTab1Logs() {
       const q = (document.getElementById('tab1-log-search-field')?.value || '').trim().toLowerCase();
+      filterAndRenderLogs(q);
+    }
+
+    function onSearchTab2Logs() {
+      const q = (document.getElementById('tab2-log-search-field')?.value || '').trim().toLowerCase();
       filterAndRenderLogs(q);
     }
 
@@ -3203,7 +3259,14 @@
 
     // Initial Sync & Realtime Polling
     fetchSwitchStatus();
+    fetchAuditLogs();
     setInterval(fetchSwitchStatus, 2500);
+    setInterval(() => {
+      fetchAuditLogs();
+      if (currentActiveTab === 'analytics') {
+        fetchAnalyticsData();
+      }
+    }, 3000);
 
     // Version & Daemon Sync (Immediately & every 60s)
     checkSystemVersion();
