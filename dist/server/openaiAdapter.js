@@ -692,10 +692,16 @@ function createOpenAiRouter(manager, rotator) {
             throw lastError || new Error('All model candidates failed.');
         }
         catch (err) {
-            res.status(err.status || 500).json({
+            const errMsg = err.message || 'Internal Server Error';
+            const isNoAccount = errMsg.includes('Chưa có tài khoản nào') || errMsg.includes('Tất cả tài khoản trong pool');
+            const statusCode = isNoAccount ? 503 : (err.status || 500);
+            res.status(statusCode).json({
                 error: {
-                    message: err.message || 'Internal Server Error',
-                    code: err.status || 500
+                    message: isNoAccount
+                        ? 'Chưa có tài khoản Google nào được kết nối vào Switch Google! Vui lòng mở http://localhost:1909 trên trình duyệt để thêm tài khoản (OAuth / API Key) hoặc nạp file backup SQLite.'
+                        : errMsg,
+                    type: isNoAccount ? 'switch_google_setup_required' : 'server_error',
+                    code: isNoAccount ? 'no_accounts_available' : (err.status || 500)
                 }
             });
         }

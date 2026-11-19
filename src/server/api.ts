@@ -656,14 +656,15 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
   });
 
-  app.listen(port, () => {
+  app.listen(port, '0.0.0.0', () => {
     console.log(`\n======================================================`);
     console.log(`  🚀 switch-google Web Dashboard & API Server:`);
-    console.log(`  🌐 Dashboard: http://localhost:${port}`);
-    console.log(`  🤖 OpenAI Gateway: http://localhost:${port}/v1`);
+    console.log(`  🌐 Dashboard: http://localhost:${port} hoặc http://0.0.0.0:${port}`);
+    console.log(`  🤖 OpenAI Gateway: http://localhost:${port}/v1 (hoặc http://<IP-may>:${port}/v1)`);
     console.log(`======================================================`);
     console.log(`- Web UI: Mở http://localhost:${port} trên trình duyệt`);
-    console.log(`- OpenAI Proxy: Cấu hình Base URL http://localhost:${port}/v1 cho Cursor/Claude/Cline`);
+    console.log(`- OpenAI Proxy: Cấu hình Base URL http://localhost:${port}/v1 cho Hermes Agent/Cursor/Cline`);
+    console.log(`- Hỗ trợ kết nối từ máy khác trong mạng LAN qua port ${port}`);
     console.log(`- GET  /api/status        : Kiểm tra trạng thái server`);
     console.log(`- GET  /api/profiles      : Danh sách các tài khoản`);
     console.log(`- POST /api/login         : Đăng nhập thêm tài khoản OAuth`);

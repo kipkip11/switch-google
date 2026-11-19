@@ -8,21 +8,37 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
 const crypto_1 = __importDefault(require("crypto"));
-const node_sqlite_1 = require("node:sqlite");
+let DatabaseSyncClass = null;
+try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const sqliteMod = require('node:sqlite');
+    DatabaseSyncClass = sqliteMod.DatabaseSync;
+}
+catch (_) {
+    // Node.js version < 22.5.0
+}
 class SqliteStorage {
     static instance;
     db;
     dbPath;
     baseDir;
+    isSqliteSupported = true;
     constructor(customBaseDir) {
         this.baseDir = customBaseDir || path_1.default.join(os_1.default.homedir(), '.switch-google');
         if (!fs_1.default.existsSync(this.baseDir)) {
             fs_1.default.mkdirSync(this.baseDir, { recursive: true, mode: 0o700 });
         }
         this.dbPath = path_1.default.join(this.baseDir, 'switch_google.sqlite');
-        this.db = new node_sqlite_1.DatabaseSync(this.dbPath);
-        this.initTables();
-        this.migrateFromLegacyIfNeeded();
+        if (DatabaseSyncClass) {
+            this.db = new DatabaseSyncClass(this.dbPath);
+            this.isSqliteSupported = true;
+            this.initTables();
+            this.migrateFromLegacyIfNeeded();
+        }
+        else {
+            this.isSqliteSupported = false;
+            console.warn('[SQLite] Node.js hiện tại chưa tích hợp module node:sqlite (cần Node >= 22.5.0). Chuyển sang chế độ lưu trữ an toàn.');
+        }
     }
     static getInstance(customBaseDir) {
         if (customBaseDir) {
@@ -459,8 +475,10 @@ class SqliteStorage {
         }
         fs_1.default.writeFileSync(this.dbPath, buffer);
         // Khởi tạo lại kết nối database
-        this.db = new node_sqlite_1.DatabaseSync(this.dbPath);
-        this.initTables();
+        if (DatabaseSyncClass) {
+            this.db = new DatabaseSyncClass(this.dbPath);
+            this.initTables();
+        }
     }
 }
 exports.SqliteStorage = SqliteStorage;

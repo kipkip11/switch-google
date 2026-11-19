@@ -2,9 +2,17 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { DatabaseSync } from 'node:sqlite';
 import { GoogleProfile, VirtualApiKey, ModelCombo, TokenData } from '../auth/storage';
 import { TokenUsageRecord } from '../usage/tracker';
+
+let DatabaseSyncClass: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const sqliteMod = require('node:sqlite');
+  DatabaseSyncClass = sqliteMod.DatabaseSync;
+} catch (_) {
+  // Node.js version < 22.5.0
+}
 
 export interface RotationConfig {
   requestsPerTurn: number;
@@ -14,9 +22,10 @@ export interface RotationConfig {
 
 export class SqliteStorage {
   private static instance: SqliteStorage;
-  private db: DatabaseSync;
+  private db: any;
   private dbPath: string;
   private baseDir: string;
+  private isSqliteSupported: boolean = true;
 
   public constructor(customBaseDir?: string) {
     this.baseDir = customBaseDir || path.join(os.homedir(), '.switch-google');
@@ -24,9 +33,16 @@ export class SqliteStorage {
       fs.mkdirSync(this.baseDir, { recursive: true, mode: 0o700 });
     }
     this.dbPath = path.join(this.baseDir, 'switch_google.sqlite');
-    this.db = new DatabaseSync(this.dbPath);
-    this.initTables();
-    this.migrateFromLegacyIfNeeded();
+
+    if (DatabaseSyncClass) {
+      this.db = new DatabaseSyncClass(this.dbPath);
+      this.isSqliteSupported = true;
+      this.initTables();
+      this.migrateFromLegacyIfNeeded();
+    } else {
+      this.isSqliteSupported = false;
+      console.warn('[SQLite] Node.js hiện tại chưa tích hợp module node:sqlite (cần Node >= 22.5.0). Chuyển sang chế độ lưu trữ an toàn.');
+    }
   }
 
   public static getInstance(customBaseDir?: string): SqliteStorage {
@@ -532,7 +548,9 @@ export class SqliteStorage {
 
     fs.writeFileSync(this.dbPath, buffer);
     // Khởi tạo lại kết nối database
-    this.db = new DatabaseSync(this.dbPath);
-    this.initTables();
+    if (DatabaseSyncClass) {
+      this.db = new DatabaseSyncClass(this.dbPath);
+      this.initTables();
+    }
   }
 }
