@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createOpenAiRouter = createOpenAiRouter;
 const express_1 = require("express");
+const geminiWebClient_1 = require("../services/geminiWebClient");
 const schemaCleaner_1 = require("./schemaCleaner");
 const tracker_1 = require("../usage/tracker");
 const ANTIGRAVITY_SYSTEM_INSTRUCTION = 'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding. You are pair programming with a USER to solve their coding task.';
@@ -40,7 +41,64 @@ function resolveGenerativeLanguageModel(model) {
 }
 async function callUpstreamGoogle(creds, actualModel, geminiBody, stream) {
     const isApiKey = creds.type === 'api_key' && creds.apiKey;
+    const isWebSession = creds.type === 'web_session' && creds.cookies;
     const isAntigravityToken = creds.type === 'token';
+    if (isWebSession) {
+        // Trích xuất prompt từ geminiBody
+        let combinedPrompt = '';
+        if (geminiBody.systemInstruction?.parts) {
+            combinedPrompt += geminiBody.systemInstruction.parts.map((p) => p.text || '').join('\n') + '\n\n';
+        }
+        if (Array.isArray(geminiBody.contents)) {
+            for (const c of geminiBody.contents) {
+                const role = c.role || 'user';
+                const text = (c.parts || []).map((p) => p.text || '').join('\n');
+                if (text)
+                    combinedPrompt += `${role.toUpperCase()}: ${text}\n`;
+            }
+        }
+        if (!combinedPrompt.trim()) {
+            combinedPrompt = 'Xin chào!';
+        }
+        const answer = await (0, geminiWebClient_1.generateContentGeminiWeb)(creds.cookies, combinedPrompt, actualModel);
+        // Giả lập Response object của fetch để tương thích pipeline downstream
+        const fakeGeminiResponse = {
+            candidates: [
+                {
+                    content: {
+                        role: 'model',
+                        parts: [{ text: answer }]
+                    },
+                    finishReason: 'STOP'
+                }
+            ],
+            usageMetadata: {
+                promptTokenCount: Math.ceil(combinedPrompt.length / 4),
+                candidatesTokenCount: Math.ceil(answer.length / 4),
+                totalTokenCount: Math.ceil((combinedPrompt.length + answer.length) / 4)
+            }
+        };
+        return {
+            ok: true,
+            status: 200,
+            json: async () => fakeGeminiResponse,
+            text: async () => JSON.stringify(fakeGeminiResponse),
+            body: {
+                getReader: () => {
+                    let sent = false;
+                    return {
+                        read: async () => {
+                            if (sent)
+                                return { done: true, value: undefined };
+                            sent = true;
+                            const sseLine = `data: ${JSON.stringify(fakeGeminiResponse)}\n\n`;
+                            return { done: false, value: new TextEncoder().encode(sseLine) };
+                        }
+                    };
+                }
+            }
+        };
+    }
     if (isApiKey) {
         const glModel = resolveGenerativeLanguageModel(actualModel);
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse&key=' : 'generateContent?key='}${creds.apiKey}`;

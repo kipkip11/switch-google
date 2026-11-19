@@ -12,14 +12,15 @@ export interface TokenData {
   expiry_date?: number | null;
 }
 
-export type ProfileType = 'oauth' | 'api_key' | 'token';
+export type ProfileType = 'oauth' | 'api_key' | 'token' | 'web_session';
 
 export interface GoogleProfile {
   name: string;
   email: string;
-  type?: ProfileType;
-  apiKey?: string;
   tokens: TokenData;
+  apiKey?: string;
+  cookies?: string;
+  type?: ProfileType;
   createdAt: number;
   updatedAt: number;
 }

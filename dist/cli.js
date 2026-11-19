@@ -78,6 +78,21 @@ program
         process.exit(1);
     }
 });
+// Command: add-cookie
+program
+    .command('add-cookie <profile_name> <cookies>')
+    .description('Thêm tài khoản trực tiếp bằng Gemini Web Session Cookies (Dành cho tài khoản bị chặn Antigravity)')
+    .option('-e, --email <email>', 'Email định danh tài khoản')
+    .action((profileName, cookies, options) => {
+    try {
+        const prof = manager.addWebSessionProfile(profileName, cookies, options.email);
+        console.log(`\n✓ Đã kết nối tài khoản Web [${prof.name}] (${prof.email}) thành công qua Session Cookies!`);
+    }
+    catch (err) {
+        console.error(`\n✗ Lỗi: ${err.message}`);
+        process.exit(1);
+    }
+});
 // Command: list
 program
     .command('list')

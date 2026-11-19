@@ -187,6 +187,32 @@ export class ProfileManager {
     return profile;
   }
 
+  public addWebSessionProfile(name: string, cookies: string, email = ''): GoogleProfile {
+    const data = this.storage.load();
+    const resolvedEmail = email || `${name}@gemini-web.google.com`;
+    const profile: GoogleProfile = {
+      name,
+      email: resolvedEmail,
+      type: 'web_session',
+      cookies,
+      tokens: {
+        access_token: 'web_session_cookie',
+        token_type: 'Bearer',
+        expiry_date: null
+      },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    data.profiles[name] = profile;
+    if (!data.activeProfile) {
+      data.activeProfile = name;
+    }
+
+    this.storage.save(data);
+    return profile;
+  }
+
   public importAntigravityKeychainSession(): GoogleProfile | null {
     if (process.platform !== 'darwin') return null;
     try {
@@ -248,6 +274,17 @@ export class ProfileManager {
         access_token: prof.apiKey || '',
         expiry_date: null
       };
+    }
+
+    if (prof.type === 'web_session' || prof.cookies) {
+      return {
+        profile: name,
+        email: prof.email,
+        type: 'web_session',
+        cookies: prof.cookies,
+        access_token: 'web_session_cookie',
+        expiry_date: null
+      } as any;
     }
 
     // Refresh if needed

@@ -121,6 +121,15 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
             });
+          } else if (creds.type === 'web_session') {
+            // Ping Gemini Web Session
+            try {
+              const { getSNlM0eToken } = await import('../services/geminiWebClient');
+              await getSNlM0eToken((creds as any).cookies || '');
+              fetchRes = { ok: true, status: 200 };
+            } catch (wErr: any) {
+              fetchRes = { ok: false, status: 401, errorText: wErr.message };
+            }
           } else if (creds.type === 'token') {
             const apiUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent';
             fetchRes = await fetch(apiUrl, {
@@ -504,6 +513,21 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         refreshToken,
         expiryDate
       );
+      res.json(saved);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Add profile via Gemini Web Session Cookies (Tận dụng tài khoản bị chặn Antigravity)
+  app.post('/api/profiles/cookie', (req: Request, res: Response) => {
+    try {
+      const { profile, email, cookies } = req.body;
+      if (!profile || !cookies) {
+        res.status(400).json({ error: 'Missing "profile" or "cookies" in request body' });
+        return;
+      }
+      const saved = manager.addWebSessionProfile(profile.trim(), cookies.trim(), email?.trim());
       res.json(saved);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -1850,7 +1850,8 @@
       <div style="display: flex; gap: 6px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
         <button class="btn-action primary" id="tab-modal-oauth" onclick="switchModalTab('oauth')">1. Google OAuth</button>
         <button class="btn-action" id="tab-modal-key" onclick="switchModalTab('key')">2. Gemini API Key</button>
-        <button class="btn-action" id="tab-modal-token" onclick="switchModalTab('token')">3. Nhập Token</button>
+        <button class="btn-action" id="tab-modal-cookie" onclick="switchModalTab('cookie')">3. 🍪 Gemini Web Cookie</button>
+        <button class="btn-action" id="tab-modal-token" onclick="switchModalTab('token')">4. Nhập Token</button>
       </div>
 
       <!-- Tab OAuth -->
@@ -1868,6 +1869,17 @@
         <input type="text" id="m-key-name" class="input-box" placeholder="Tên cổng (vd: gemini-pro-key)..." />
         <input type="password" id="m-key-value" class="input-box" placeholder="Dán Gemini API Key (AIzaSy...)..." />
         <button class="btn-action primary" style="align-self: flex-start;" onclick="executeAddApiKey()">Lưu Cổng Mạng</button>
+      </div>
+
+      <!-- Tab Cookie Web Session -->
+      <div id="m-pane-cookie" style="display: none; flex-direction: column; gap: 10px;">
+        <p style="font-size: 0.8rem; color: #38bdf8; margin: 0;">
+          💡 <b>Cứu cánh tài khoản bị chặn Antigravity:</b> Mở <a href="https://gemini.google.com" target="_blank" style="color: #38bdf8; text-decoration: underline;">gemini.google.com</a>, bấm F12 (Network) copy header Cookie (chứa __Secure-1PSID) dán vào đây. Switch Google sẽ tự động chuyển thành OpenAI API.
+        </p>
+        <input type="text" id="m-cookie-name" class="input-box" placeholder="Tên cổng (vd: acc-web-1)..." />
+        <input type="text" id="m-cookie-email" class="input-box" placeholder="Email tài khoản (tùy chọn)..." />
+        <textarea id="m-cookie-value" class="input-box" style="height: 70px; resize: vertical;" placeholder="Dán chuỗi Cookie từ trình duyệt (__Secure-1PSID=...; __Secure-1PSIDTS=...)..."></textarea>
+        <button class="btn-action primary" style="align-self: flex-start;" onclick="executeAddCookie()">Lưu Cổng Web Session</button>
       </div>
 
       <!-- Tab Token -->
@@ -1933,7 +1945,7 @@
       document.getElementById('modal-add-port').classList.remove('open');
     }
     function switchModalTab(tabId) {
-      ['oauth', 'key', 'token'].forEach(t => {
+      ['oauth', 'key', 'cookie', 'token'].forEach(t => {
         const pane = document.getElementById(`m-pane-${t}`);
         const btn = document.getElementById(`tab-modal-${t}`);
         if (pane) pane.style.display = (t === tabId ? (t === 'oauth' ? 'block' : 'flex') : 'none');
@@ -3060,6 +3072,34 @@
           fetchSwitchStatus();
         }
       } catch (_) {}
+    }
+
+    async function executeAddCookie() {
+      const name = document.getElementById('m-cookie-name').value.trim();
+      const email = document.getElementById('m-cookie-email').value.trim();
+      const cookies = document.getElementById('m-cookie-value').value.trim();
+      if (!name || !cookies) return toast('Vui lòng nhập tên cổng và chuỗi Cookie');
+
+      try {
+        const res = await fetch('/api/profiles/cookie', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: name, email, cookies })
+        });
+        if (res.ok) {
+          toast(`✓ Đã thêm Cổng Gemini Web Cookie thành công!`);
+          document.getElementById('m-cookie-name').value = '';
+          document.getElementById('m-cookie-email').value = '';
+          document.getElementById('m-cookie-value').value = '';
+          closeAddModal();
+          fetchSwitchStatus();
+        } else {
+          const errData = await res.json();
+          toast(`✗ Lỗi: ${errData.error || 'Không thể lưu'}`);
+        }
+      } catch (e) {
+        toast('✗ Lỗi kết nối server');
+      }
     }
 
     async function executeAddToken() {

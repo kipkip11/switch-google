@@ -320,6 +320,7 @@ export class SqliteStorage {
         email TEXT,
         type TEXT,
         api_key TEXT,
+        cookies TEXT,
         tokens_json TEXT,
         created_at INTEGER,
         updated_at INTEGER
@@ -514,6 +515,7 @@ export class SqliteStorage {
       email: r.email,
       type: r.type,
       apiKey: r.api_key || undefined,
+      cookies: r.cookies || undefined,
       tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
       createdAt: r.created_at,
       updatedAt: r.updated_at
@@ -521,16 +523,21 @@ export class SqliteStorage {
   }
 
   public saveProfile(profile: GoogleProfile): void {
+    try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN cookies TEXT;').run();
+    } catch (_) {}
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO profiles 
-      (name, email, type, api_key, tokens_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       profile.name,
       profile.email || '',
       profile.type || 'oauth',
       profile.apiKey || null,
+      profile.cookies || null,
       JSON.stringify(profile.tokens || {}),
       profile.createdAt || Date.now(),
       profile.updatedAt || Date.now()

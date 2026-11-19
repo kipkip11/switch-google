@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -120,6 +153,17 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
                         });
+                    }
+                    else if (creds.type === 'web_session') {
+                        // Ping Gemini Web Session
+                        try {
+                            const { getSNlM0eToken } = await Promise.resolve().then(() => __importStar(require('../services/geminiWebClient')));
+                            await getSNlM0eToken(creds.cookies || '');
+                            fetchRes = { ok: true, status: 200 };
+                        }
+                        catch (wErr) {
+                            fetchRes = { ok: false, status: 401, errorText: wErr.message };
+                        }
                     }
                     else if (creds.type === 'token') {
                         const apiUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent';
@@ -479,6 +523,21 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                 return;
             }
             const saved = manager.addDirectTokenProfile(profile.trim(), email || 'manual-token@google.com', accessToken.trim(), refreshToken, expiryDate);
+            res.json(saved);
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Add profile via Gemini Web Session Cookies (Tận dụng tài khoản bị chặn Antigravity)
+    app.post('/api/profiles/cookie', (req, res) => {
+        try {
+            const { profile, email, cookies } = req.body;
+            if (!profile || !cookies) {
+                res.status(400).json({ error: 'Missing "profile" or "cookies" in request body' });
+                return;
+            }
+            const saved = manager.addWebSessionProfile(profile.trim(), cookies.trim(), email?.trim());
             res.json(saved);
         }
         catch (err) {

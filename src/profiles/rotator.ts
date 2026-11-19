@@ -17,6 +17,7 @@ export interface AccountCredentials {
   email: string;
   type?: string;
   apiKey?: string;
+  cookies?: string;
   access_token: string;
   expiry_date?: number | null;
 }
