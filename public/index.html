@@ -1955,6 +1955,52 @@
     </div>
   </div>
 
+  <!-- ======================================================== -->
+  <!-- MODAL: UPGRADE TO GEMINI WEB MODE                       -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="modal-web-upgrade">
+    <div class="modal-dialog" style="max-width: 500px; border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 0 35px rgba(168, 85, 247, 0.2);">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          <span>⚡ Chuyển Sang Gemini Web Mode</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeWebUpgradeModal()">&times;</button>
+      </div>
+
+      <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 10px 12px; font-size: 0.74rem; color: #e2e8f0; line-height: 1.4;">
+        <div style="font-weight: 800; color: #c084fc; margin-bottom: 2px;" id="web-upgrade-account-title">Tài khoản: ...</div>
+        Tài khoản này đang bị Google chặn CloudCode/Antigravity API. Gemini Web Mode kết nối thẳng tới giao diện chính thức (gemini.google.com), giúp bạn <strong>vượt qua 100% rào cản chặn</strong> của Google!
+      </div>
+
+      <!-- Cách 1: Tự động qua Chrome -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 8px; padding: 12px;">
+        <div style="font-weight: 700; font-size: 0.8rem; color: #38bdf8; margin-bottom: 4px;">Cách 1: Tự Động Bắt Cookie Qua Chrome (1-Click)</div>
+        <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+          Hệ thống sẽ mở cửa sổ Chrome. Bạn chỉ cần đăng nhập tài khoản Google này trên Chrome, hệ thống sẽ tự động bắt lấy Cookie trong nền.
+        </p>
+        <button class="btn-action primary" id="btn-start-auto-web" style="width: 100%; padding: 8px; font-size: 0.78rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); font-weight: 700; border-radius: 6px;" onclick="startAutoWebCapture()">
+          🚀 Mở Chrome & Tự Động Bắt Cookie
+        </button>
+        <div id="auto-web-progress" style="display: none; margin-top: 8px; font-size: 0.72rem; color: #38bdf8; text-align: center;">
+          <span class="micro-led act-pulse" style="display: inline-block; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; margin-right: 4px;"></span>
+          <span id="auto-web-status-text">Đang mở Chrome... Hãy đăng nhập trên cửa sổ trình duyệt</span>
+        </div>
+      </div>
+
+      <!-- Cách 2: Dán Cookie thủ công -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 8px; padding: 12px;">
+        <div style="font-weight: 700; font-size: 0.8rem; color: #a78bfa; margin-bottom: 4px;">Cách 2: Nạp Cookie Thủ Công Nhanh (Nếu đã có sẵn)</div>
+        <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px;">
+          Nếu bạn đã mở sẵn <a href="https://gemini.google.com" target="_blank" style="color: #38bdf8;">gemini.google.com</a> trên trình duyệt, copy cookie <code>__Secure-1PSID</code> rồi dán vào đây:
+        </p>
+        <input type="text" id="manual-web-cookie" class="input-box" placeholder="Dán cookie __Secure-1PSID=... hoặc chuỗi Cookie vào đây..." style="margin-bottom: 8px;" />
+        <button class="btn-action" style="width: 100%; padding: 8px; font-size: 0.78rem; background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; font-weight: 700; border-radius: 6px;" onclick="submitManualWebCookie()">
+          ⚡ Kích Hoạt Ngay Bằng Cookie Này
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-notice">Thông báo</div>
 
   <script>
@@ -3177,23 +3223,90 @@
       }
     }
 
-    async function upgradeToWebMode(profile) {
-      toast(`Đang mở Chrome để chuyển [${profile}] sang Web Mode... Vui lòng xác thực trên trình duyệt.`);
+    let currentUpgradeProfile = null;
+
+    function upgradeToWebMode(profile) {
+      currentUpgradeProfile = profile;
+      const titleEl = document.getElementById('web-upgrade-account-title');
+      if (titleEl) titleEl.innerText = `Tài khoản: ${profile}`;
+      const modal = document.getElementById('modal-web-upgrade');
+      if (modal) modal.classList.add('open');
+      const progress = document.getElementById('auto-web-progress');
+      if (progress) progress.style.display = 'none';
+      const btn = document.getElementById('btn-start-auto-web');
+      if (btn) btn.disabled = false;
+      const input = document.getElementById('manual-web-cookie');
+      if (input) input.value = '';
+    }
+
+    function closeWebUpgradeModal() {
+      const modal = document.getElementById('modal-web-upgrade');
+      if (modal) modal.classList.remove('open');
+      currentUpgradeProfile = null;
+    }
+
+    async function startAutoWebCapture() {
+      if (!currentUpgradeProfile) return;
+      const btn = document.getElementById('btn-start-auto-web');
+      const progress = document.getElementById('auto-web-progress');
+      const statusText = document.getElementById('auto-web-status-text');
+      if (btn) btn.disabled = true;
+      if (progress) progress.style.display = 'block';
+      if (statusText) statusText.innerText = 'Đang mở Chrome... Hãy đăng nhập tài khoản Google và mở trang Gemini trên cửa sổ Chrome vừa xuất hiện!';
+
+      toast(`Đang mở Chrome để chuyển [${currentUpgradeProfile}] sang Web Mode...`);
       try {
-        const res = await fetch(`/api/profiles/${encodeURIComponent(profile)}/upgrade-web`, {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(currentUpgradeProfile)}/upgrade-web`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
+        const data = await res.json();
         if (res.ok) {
-          const data = await res.json();
           toast(`✓ ${data.message || 'Đã chuyển sang Web Mode thành công!'}`);
+          const p = currentUpgradeProfile;
+          closeWebUpgradeModal();
           fetchSwitchStatus();
+          runPingSingle(p);
         } else {
-          const err = await res.json();
-          toast(`✗ Lỗi: ${err.error || 'Không thể chuyển đổi'}`);
+          if (statusText) statusText.innerText = `✗ Lỗi: ${data.error || 'Không thể chuyển đổi'}`;
+          if (btn) btn.disabled = false;
+          alert(`Lỗi: ${data.error || 'Không thể chuyển đổi'}`);
         }
       } catch (e) {
-        toast(`✗ Lỗi kết nối: ${e.message}`);
+        if (statusText) statusText.innerText = `✗ Lỗi kết nối: ${e.message}`;
+        if (btn) btn.disabled = false;
+        alert(`Lỗi kết nối: ${e.message}`);
+      }
+    }
+
+    async function submitManualWebCookie() {
+      if (!currentUpgradeProfile) return;
+      const cookieInput = document.getElementById('manual-web-cookie');
+      const cookieVal = cookieInput ? cookieInput.value.trim() : '';
+      if (!cookieVal) {
+        alert('Vui lòng dán chuỗi Cookie hoặc cookie __Secure-1PSID vào ô!');
+        return;
+      }
+
+      toast('⏳ Đang kiểm tra Cookie và kích hoạt Web Mode...');
+      try {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(currentUpgradeProfile)}/set-cookies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies: cookieVal })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast(`✓ ${data.message || 'Đã kích hoạt Web Mode thành công!'}`);
+          const p = currentUpgradeProfile;
+          closeWebUpgradeModal();
+          fetchSwitchStatus();
+          runPingSingle(p);
+        } else {
+          alert(`Lỗi kích hoạt: ${data.error || 'Cookie không hợp lệ'}`);
+        }
+      } catch (e) {
+        alert(`Lỗi kết nối: ${e.message}`);
       }
     }
 

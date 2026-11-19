@@ -247,7 +247,8 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
       `--user-data-dir=${tempProfileDir}`,
       '--no-first-run',
       '--no-default-browser-check',
-      '--window-size=1024,768',
+      '--window-position=120,80',
+      '--window-size=1100,800',
       startUrl
     ];
 
@@ -255,6 +256,13 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
       detached: false,
       stdio: 'ignore'
     });
+
+    if (os.platform() === 'darwin') {
+      try {
+        const { exec } = await import('child_process');
+        exec('osascript -e \'tell application "Google Chrome" to activate\'');
+      } catch (_) {}
+    }
 
     // Chờ CDP server sẵn sàng
     let wsUrl: string | null = null;

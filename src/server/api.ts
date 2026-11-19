@@ -646,6 +646,40 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
   });
 
+  // Nạp trực tiếp Cookie cho profile đã có sẵn (Instant Web Mode Activation)
+  app.post('/api/profiles/:profile/set-cookies', async (req: Request, res: Response) => {
+    const profile = req.params.profile;
+    const { cookies } = req.body || {};
+    if (!cookies || typeof cookies !== 'string' || !cookies.trim()) {
+      return res.status(400).json({ error: 'Chuỗi Cookie không được để trống' });
+    }
+    const raw = manager.getRawProfile(profile);
+    if (!raw) {
+      return res.status(404).json({ error: `Profile '${profile}' không tồn tại` });
+    }
+
+    try {
+      const { getSNlM0eToken, normalizeCookieString } = await import('../services/geminiWebClient');
+      const normalizedCookies = normalizeCookieString(cookies);
+      const snlm0e = await getSNlM0eToken(normalizedCookies);
+      if (!snlm0e) {
+        return res.status(400).json({
+          error: 'Cookie không hợp lệ hoặc đã hết hạn (không trích xuất được token bảo mật SNlM0e từ Google).'
+        });
+      }
+
+      const upgraded = manager.upgradeOauthToWebSession(profile, normalizedCookies, raw.email);
+      rotator.unbanAccount(profile);
+      res.json({
+        success: true,
+        profile: upgraded,
+        message: `Đã kích hoạt Web Mode thành công cho [${profile}]!`
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: `Lỗi kích hoạt Cookie: ${err.message}` });
+    }
+  });
+
   // Tự động quét và kích hoạt chuyển sang Web Mode cho tất cả tài khoản bị chặn (Zero-Touch Auto-Heal)
   app.post('/api/auto-recover', async (req: Request, res: Response) => {
     try {
