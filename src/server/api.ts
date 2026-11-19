@@ -535,8 +535,16 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
   });
 
+  let isWebLoginInProgress = false;
+
   // Tự động mở Google Login và bắt Cookie Gemini Web Mode (1-Click OAuth Web Mode)
   app.post('/api/login/web', async (req: Request, res: Response) => {
+    if (isWebLoginInProgress) {
+      return res.status(409).json({
+        error: 'Đang có một tiến trình đăng nhập Web Mode khác đang mở. Vui lòng hoàn tất hoặc đóng cửa sổ trình duyệt hiện tại.'
+      });
+    }
+    isWebLoginInProgress = true;
     try {
       const { profile } = req.body || {};
       const captured = await autoCaptureGeminiWebSession(180000);
@@ -550,6 +558,8 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    } finally {
+      isWebLoginInProgress = false;
     }
   });
 
