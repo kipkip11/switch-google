@@ -661,10 +661,16 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     try {
       const { getSNlM0eToken, normalizeCookieString } = await import('../services/geminiWebClient');
       const normalizedCookies = normalizeCookieString(cookies);
-      const snlm0e = await getSNlM0eToken(normalizedCookies);
-      if (!snlm0e) {
+      let snlm0e = '';
+      try {
+        snlm0e = await getSNlM0eToken(normalizedCookies);
+      } catch (_) {}
+
+      // Nếu không lấy được snlm0e và chuỗi không chứa SID tối thiểu thì báo lỗi
+      const hasCoreCookie = normalizedCookies.includes('__Secure-1PSID') || normalizedCookies.includes('SID');
+      if (!snlm0e && !hasCoreCookie) {
         return res.status(400).json({
-          error: 'Cookie không hợp lệ hoặc đã hết hạn (không trích xuất được token bảo mật SNlM0e từ Google).'
+          error: 'Cookie không hợp lệ hoặc thiếu cookie cốt lõi __Secure-1PSID.'
         });
       }
 

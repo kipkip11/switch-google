@@ -408,34 +408,34 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
           } catch (_) {}
         }
 
-        if (finalSnlm0e) {
-          // Lấy email thông qua trang account Google nếu chưa có
-          if (!detectedEmail) {
-            try {
-              const targets = await cdpClient.send('Target.getTargets');
-              const geminiTarget = targets.targetInfos.find((t: any) => t.url.includes('google.com'));
+        // Lấy email thông qua trang account Google nếu chưa có
+        if (!detectedEmail) {
+          try {
+            const targets = await cdpClient.send('Target.getTargets');
+            if (targets && Array.isArray(targets.targetInfos)) {
+              const geminiTarget = targets.targetInfos.find((t: any) => t.url && t.url.includes('google.com'));
               if (geminiTarget && geminiTarget.title) {
                 const emailMatch = geminiTarget.title.match(/([a-zA-Z0-9._%+-]+@gmail\.com)/i);
                 if (emailMatch) {
                   detectedEmail = emailMatch[1];
                 }
               }
-            } catch (_) {}
-          }
-
-          if (!detectedEmail && targetEmail) {
-            detectedEmail = targetEmail;
-          }
-          if (!detectedEmail) {
-            detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
-          }
-
-          return {
-            email: detectedEmail,
-            cookies: cookieString,
-            snlm0e: finalSnlm0e
-          };
+            }
+          } catch (_) {}
         }
+
+        if (!detectedEmail && targetEmail) {
+          detectedEmail = targetEmail;
+        }
+        if (!detectedEmail) {
+          detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
+        }
+
+        return {
+          email: detectedEmail,
+          cookies: cookieString,
+          snlm0e: finalSnlm0e || ''
+        };
       }
 
       await new Promise((r) => setTimeout(r, 1000));
