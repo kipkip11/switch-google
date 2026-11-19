@@ -89,7 +89,7 @@ for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
             Write-Host "⚠ File đang được giải phóng, thử lại lần $attempt..." -ForegroundColor Yellow
             Start-Sleep -Seconds 1
         } else {
-            Write-Host "✗ Không thể sao chép file vào $targetDir: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "✗ Không thể sao chép file vào: $($targetDir) - $($_.Exception.Message)" -ForegroundColor Red
             exit 1
         }
     }
