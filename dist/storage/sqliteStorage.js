@@ -15,14 +15,233 @@ try {
     DatabaseSyncClass = sqliteMod.DatabaseSync;
 }
 catch (_) {
-    // Node.js version < 22.5.0
+    // Node.js version < 22.5.0 (Sẽ dùng FallbackSqliteDb)
+}
+/**
+ * Fallback Database Engine cho các phiên bản Node.js < 22.5.0
+ * Tương thích 100% interface DatabaseSync của SQLite
+ */
+class FallbackSqliteDb {
+    filePath;
+    data;
+    constructor(filePath) {
+        this.filePath = filePath;
+        this.data = {
+            profiles: {},
+            virtual_keys: {},
+            model_combos: {},
+            settings: {},
+            usage_logs: []
+        };
+        this.loadFromFile();
+    }
+    loadFromFile() {
+        try {
+            if (fs_1.default.existsSync(this.filePath)) {
+                const raw = fs_1.default.readFileSync(this.filePath, 'utf8');
+                if (raw.trim().startsWith('{')) {
+                    const parsed = JSON.parse(raw);
+                    this.data = {
+                        profiles: parsed.profiles || {},
+                        virtual_keys: parsed.virtual_keys || {},
+                        model_combos: parsed.model_combos || {},
+                        settings: parsed.settings || {},
+                        usage_logs: parsed.usage_logs || []
+                    };
+                    return;
+                }
+            }
+        }
+        catch (_) { }
+        this.persist();
+    }
+    persist() {
+        try {
+            fs_1.default.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
+        }
+        catch (_) { }
+    }
+    exec(_sql) {
+        if (_sql.includes('DELETE FROM usage_logs;')) {
+            this.data.usage_logs = [];
+            this.persist();
+        }
+    }
+    close() {
+        this.persist();
+    }
+    prepare(sql) {
+        const s = sql.trim().replace(/\s+/g, ' ');
+        return {
+            run: (...args) => {
+                // Settings
+                if (s.startsWith('INSERT OR REPLACE INTO settings')) {
+                    this.data.settings[args[0]] = String(args[1]);
+                    this.persist();
+                    return { changes: 1 };
+                }
+                // Profiles
+                if (s.startsWith('INSERT OR REPLACE INTO profiles')) {
+                    this.data.profiles[args[0]] = {
+                        name: args[0],
+                        email: args[1],
+                        type: args[2],
+                        api_key: args[3],
+                        tokens_json: args[4],
+                        created_at: args[5],
+                        updated_at: args[6]
+                    };
+                    this.persist();
+                    return { changes: 1 };
+                }
+                if (s.startsWith('DELETE FROM profiles WHERE name = ?')) {
+                    const existed = Boolean(this.data.profiles[args[0]]);
+                    delete this.data.profiles[args[0]];
+                    this.persist();
+                    return { changes: existed ? 1 : 0 };
+                }
+                // Virtual Keys
+                if (s.startsWith('INSERT OR REPLACE INTO virtual_keys')) {
+                    this.data.virtual_keys[args[0]] = {
+                        id: args[0],
+                        name: args[1],
+                        key: args[2],
+                        created_at: args[3],
+                        last_used_at: args[4]
+                    };
+                    this.persist();
+                    return { changes: 1 };
+                }
+                if (s.startsWith('DELETE FROM virtual_keys')) {
+                    let count = 0;
+                    for (const [id, k] of Object.entries(this.data.virtual_keys)) {
+                        if (id === args[0] || k.key === args[0] || (args[1] && (id === args[1] || k.key === args[1]))) {
+                            delete this.data.virtual_keys[id];
+                            count++;
+                        }
+                    }
+                    this.persist();
+                    return { changes: count };
+                }
+                if (s.startsWith('UPDATE virtual_keys SET last_used_at = ? WHERE key = ?')) {
+                    for (const k of Object.values(this.data.virtual_keys)) {
+                        if (k.key === args[1]) {
+                            k.last_used_at = args[0];
+                        }
+                    }
+                    this.persist();
+                    return { changes: 1 };
+                }
+                // Model Combos
+                if (s.startsWith('INSERT OR REPLACE INTO model_combos')) {
+                    this.data.model_combos[args[0]] = {
+                        id: args[0],
+                        name: args[1],
+                        strategy: args[2],
+                        models_json: args[3],
+                        created_at: args[4]
+                    };
+                    this.persist();
+                    return { changes: 1 };
+                }
+                if (s.startsWith('DELETE FROM model_combos')) {
+                    let count = 0;
+                    for (const [id, c] of Object.entries(this.data.model_combos)) {
+                        if (id === args[0] || c.name === args[0] || (args[1] && (id === args[1] || c.name === args[1]))) {
+                            delete this.data.model_combos[id];
+                            count++;
+                        }
+                    }
+                    this.persist();
+                    return { changes: count };
+                }
+                // Usage Logs
+                if (s.startsWith('INSERT INTO usage_logs')) {
+                    this.data.usage_logs.unshift({
+                        id: args[0],
+                        timestamp: args[1],
+                        profile: args[2],
+                        email: args[3],
+                        model: args[4],
+                        virtual_key: args[5],
+                        prompt_tokens: args[6],
+                        completion_tokens: args[7],
+                        total_tokens: args[8],
+                        latency_ms: args[9],
+                        status_code: args[10],
+                        stream: args[11]
+                    });
+                    if (this.data.usage_logs.length > 5000) {
+                        this.data.usage_logs = this.data.usage_logs.slice(0, 5000);
+                    }
+                    this.persist();
+                    return { changes: 1 };
+                }
+                return { changes: 0 };
+            },
+            get: (...args) => {
+                // Settings
+                if (s.startsWith('SELECT value FROM settings WHERE key = ?')) {
+                    const val = this.data.settings[args[0]];
+                    return val !== undefined ? { value: val } : null;
+                }
+                // Profiles
+                if (s.startsWith('SELECT COUNT(*) as count FROM profiles')) {
+                    return { count: Object.keys(this.data.profiles).length };
+                }
+                if (s.startsWith('SELECT * FROM profiles WHERE name = ?')) {
+                    return this.data.profiles[args[0]] || null;
+                }
+                // Model Combos
+                if (s.startsWith('SELECT * FROM model_combos WHERE id = ? OR name = ?')) {
+                    for (const c of Object.values(this.data.model_combos)) {
+                        if (c.id === args[0] || c.name === args[1] || c.id === args[1] || c.name === args[0]) {
+                            return c;
+                        }
+                    }
+                    return null;
+                }
+                // Usage Logs count
+                if (s.startsWith('SELECT COUNT(*) as count FROM usage_logs')) {
+                    return { count: this.data.usage_logs.length };
+                }
+                return null;
+            },
+            all: (...args) => {
+                // Profiles
+                if (s.startsWith('SELECT * FROM profiles ORDER BY name ASC')) {
+                    return Object.values(this.data.profiles).sort((a, b) => a.name.localeCompare(b.name));
+                }
+                // Virtual Keys
+                if (s.startsWith('SELECT * FROM virtual_keys ORDER BY created_at DESC')) {
+                    return Object.values(this.data.virtual_keys).sort((a, b) => b.created_at - a.created_at);
+                }
+                // Model Combos
+                if (s.startsWith('SELECT * FROM model_combos ORDER BY created_at ASC')) {
+                    return Object.values(this.data.model_combos).sort((a, b) => a.created_at - b.created_at);
+                }
+                // Usage Logs
+                if (s.startsWith('SELECT * FROM usage_logs WHERE timestamp >= ? ORDER BY timestamp ASC')) {
+                    const cutoff = Number(args[0]) || 0;
+                    return this.data.usage_logs
+                        .filter((l) => l.timestamp >= cutoff)
+                        .sort((a, b) => a.timestamp - b.timestamp);
+                }
+                if (s.startsWith('SELECT * FROM usage_logs ORDER BY timestamp DESC LIMIT ?')) {
+                    const limit = Number(args[0]) || 100;
+                    return this.data.usage_logs.slice(0, limit);
+                }
+                return [];
+            }
+        };
+    }
 }
 class SqliteStorage {
     static instance;
     db;
     dbPath;
     baseDir;
-    isSqliteSupported = true;
+    isNativeSqlite;
     constructor(customBaseDir) {
         this.baseDir = customBaseDir || path_1.default.join(os_1.default.homedir(), '.switch-google');
         if (!fs_1.default.existsSync(this.baseDir)) {
@@ -31,14 +250,14 @@ class SqliteStorage {
         this.dbPath = path_1.default.join(this.baseDir, 'switch_google.sqlite');
         if (DatabaseSyncClass) {
             this.db = new DatabaseSyncClass(this.dbPath);
-            this.isSqliteSupported = true;
-            this.initTables();
-            this.migrateFromLegacyIfNeeded();
+            this.isNativeSqlite = true;
         }
         else {
-            this.isSqliteSupported = false;
-            console.warn('[SQLite] Node.js hiện tại chưa tích hợp module node:sqlite (cần Node >= 22.5.0). Chuyển sang chế độ lưu trữ an toàn.');
+            this.db = new FallbackSqliteDb(this.dbPath);
+            this.isNativeSqlite = false;
         }
+        this.initTables();
+        this.migrateFromLegacyIfNeeded();
     }
     static getInstance(customBaseDir) {
         if (customBaseDir) {
@@ -139,7 +358,7 @@ class SqliteStorage {
                         dec += decipher.final('utf8');
                         const data = JSON.parse(dec);
                         if (data.profiles) {
-                            for (const [name, p] of Object.entries(data.profiles)) {
+                            for (const p of Object.values(data.profiles)) {
                                 this.saveProfile(p);
                             }
                         }
@@ -393,7 +612,7 @@ class SqliteStorage {
       (id, timestamp, profile, email, model, virtual_key, prompt_tokens, completion_tokens, total_tokens, latency_ms, status_code, stream)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(entry.id, entry.timestamp, entry.profile || '', entry.email || '', entry.model || '', entry.virtualKey || '', entry.promptTokens || 0, entry.completionTokens || 0, entry.totalTokens || 0, entry.latencyMs || 0, entry.statusCode || 200, entry.stream ? 1 : 0);
-        // Keep table size manageable (limit to latest 10,000 entries)
+        // Keep table size manageable
         try {
             this.db.exec(`
         DELETE FROM usage_logs WHERE id NOT IN (
@@ -456,11 +675,13 @@ class SqliteStorage {
     }
     // Backup & Restore SQLite Binary File
     exportDatabaseBuffer() {
-        // Flush any pending WAL/changes
         try {
             this.db.exec('PRAGMA wal_checkpoint(FULL);');
         }
         catch (_) { }
+        if (this.db instanceof FallbackSqliteDb) {
+            this.db.persist();
+        }
         return fs_1.default.readFileSync(this.dbPath);
     }
     importDatabaseBuffer(buffer) {
@@ -468,17 +689,18 @@ class SqliteStorage {
             this.db.close();
         }
         catch (_) { }
-        // Lưu backup trước khi ghi đè
         const backupOld = this.dbPath + '.bak.' + Date.now();
         if (fs_1.default.existsSync(this.dbPath)) {
             fs_1.default.copyFileSync(this.dbPath, backupOld);
         }
         fs_1.default.writeFileSync(this.dbPath, buffer);
-        // Khởi tạo lại kết nối database
         if (DatabaseSyncClass) {
             this.db = new DatabaseSyncClass(this.dbPath);
-            this.initTables();
         }
+        else {
+            this.db = new FallbackSqliteDb(this.dbPath);
+        }
+        this.initTables();
     }
 }
 exports.SqliteStorage = SqliteStorage;
