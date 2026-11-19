@@ -355,7 +355,7 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
         const active = manager.getActiveProfileName();
         res.json({
             status: 'healthy',
-            version: '1.1.1',
+            version: '1.2.1',
             totalProfiles: profiles.length,
             activeProfile: active,
             hasProfiles: profiles.length > 0,
@@ -363,39 +363,7 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
             help: profiles.length === 0 ? 'Vui lòng mở http://localhost:1909 để thêm tài khoản Google hoặc API Key trước khi sử dụng.' : 'Hệ thống sẵn sàng phục vụ bên thứ 3.'
         });
     });
-    // Authentication Middleware for Virtual API Keys
-    router.use((req, res, next) => {
-        const keys = manager.getApiKeys();
-        if (keys.length === 0) {
-            return next();
-        }
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            res.status(401).json({
-                error: {
-                    message: 'Missing or invalid Authorization header. Provide: Bearer sk-switch-...',
-                    type: 'invalid_request_error',
-                    code: 'unauthorized'
-                }
-            });
-            return;
-        }
-        const token = authHeader.slice(7).trim();
-        const matched = keys.find((k) => k.key === token);
-        if (!matched) {
-            res.status(401).json({
-                error: {
-                    message: 'Invalid API Key provided',
-                    type: 'invalid_request_error',
-                    code: 'invalid_api_key'
-                }
-            });
-            return;
-        }
-        manager.touchApiKey(token);
-        next();
-    });
-    // GET /v1/models
+    // GET /v1/models (Công khai, không chặn 401 khi Gateway/client thăm dò)
     router.get('/models', (req, res) => {
         const baseModels = [
             'claude-3-7-sonnet',
@@ -439,6 +407,38 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
             object: 'list',
             data: modelList
         });
+    });
+    // Authentication Middleware for Virtual API Keys
+    router.use((req, res, next) => {
+        const keys = manager.getApiKeys();
+        if (keys.length === 0) {
+            return next();
+        }
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            res.status(401).json({
+                error: {
+                    message: 'Missing or invalid Authorization header. Provide: Bearer sk-switch-...',
+                    type: 'invalid_request_error',
+                    code: 'unauthorized'
+                }
+            });
+            return;
+        }
+        const token = authHeader.slice(7).trim();
+        const matched = keys.find((k) => k.key === token);
+        if (!matched) {
+            res.status(401).json({
+                error: {
+                    message: 'Invalid API Key provided',
+                    type: 'invalid_request_error',
+                    code: 'invalid_api_key'
+                }
+            });
+            return;
+        }
+        manager.touchApiKey(token);
+        next();
     });
     // POST /v1/chat/completions
     router.post('/chat/completions', async (req, res) => {
@@ -561,8 +561,9 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
                             }
                             const parts = candidate.content?.parts || [];
                             for (const part of parts) {
-                                // Thinking / Reasoning parts
-                                if (part.thought === true || (part.text && (part.thoughtSignature || part.thought_signature))) {
+                                // Chỉ coi là Thinking / Reasoning khi có cờ thought === true rõ ràng
+                                // (Google CloudCode đính kèm thoughtSignature vào cả text bình thường)
+                                if (part.thought === true) {
                                     sendFirstChunkIfNeeded();
                                     if (part.text) {
                                         res.write(`data: ${JSON.stringify({
@@ -697,7 +698,7 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
                     let reasoningText = '';
                     const toolCalls = [];
                     for (const part of parts) {
-                        if (part.thought === true || (part.text && (part.thoughtSignature || part.thought_signature))) {
+                        if (part.thought === true) {
                             if (part.text) {
                                 reasoningText += part.text;
                             }
@@ -716,6 +717,11 @@ function createOpenAiRouter(manager, rotator, port = 1909) {
                                 }
                             });
                         }
+                    }
+                    // Fallback an toàn: Nếu contentText rỗng nhưng có reasoningText (do nhầm lẫn), chuyển sang contentText
+                    if (!contentText && reasoningText) {
+                        contentText = reasoningText;
+                        reasoningText = '';
                     }
                     const promptTokens = data.usageMetadata?.promptTokenCount || 0;
                     const completionTokens = data.usageMetadata?.candidatesTokenCount || 0;

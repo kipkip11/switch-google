@@ -371,7 +371,7 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
     const active = manager.getActiveProfileName();
     res.json({
       status: 'healthy',
-      version: '1.1.1',
+      version: '1.2.1',
       totalProfiles: profiles.length,
       activeProfile: active,
       hasProfiles: profiles.length > 0,
@@ -380,43 +380,7 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
     });
   });
 
-  // Authentication Middleware for Virtual API Keys
-  router.use((req: Request, res: Response, next: NextFunction) => {
-    const keys = manager.getApiKeys();
-    if (keys.length === 0) {
-      return next();
-    }
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        error: {
-          message: 'Missing or invalid Authorization header. Provide: Bearer sk-switch-...',
-          type: 'invalid_request_error',
-          code: 'unauthorized'
-        }
-      });
-      return;
-    }
-
-    const token = authHeader.slice(7).trim();
-    const matched = keys.find((k) => k.key === token);
-    if (!matched) {
-      res.status(401).json({
-        error: {
-          message: 'Invalid API Key provided',
-          type: 'invalid_request_error',
-          code: 'invalid_api_key'
-        }
-      });
-      return;
-    }
-
-    manager.touchApiKey(token);
-    next();
-  });
-
-  // GET /v1/models
+  // GET /v1/models (Công khai, không chặn 401 khi Gateway/client thăm dò)
   router.get('/models', (req: Request, res: Response) => {
     const baseModels = [
       'claude-3-7-sonnet',
@@ -460,6 +424,42 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
       object: 'list',
       data: modelList
     });
+  });
+
+  // Authentication Middleware for Virtual API Keys
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    const keys = manager.getApiKeys();
+    if (keys.length === 0) {
+      return next();
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        error: {
+          message: 'Missing or invalid Authorization header. Provide: Bearer sk-switch-...',
+          type: 'invalid_request_error',
+          code: 'unauthorized'
+        }
+      });
+      return;
+    }
+
+    const token = authHeader.slice(7).trim();
+    const matched = keys.find((k) => k.key === token);
+    if (!matched) {
+      res.status(401).json({
+        error: {
+          message: 'Invalid API Key provided',
+          type: 'invalid_request_error',
+          code: 'invalid_api_key'
+        }
+      });
+      return;
+    }
+
+    manager.touchApiKey(token);
+    next();
   });
 
   // POST /v1/chat/completions
@@ -600,8 +600,9 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
 
               const parts = candidate.content?.parts || [];
               for (const part of parts) {
-                // Thinking / Reasoning parts
-                if (part.thought === true || (part.text && (part.thoughtSignature || part.thought_signature))) {
+                // Chỉ coi là Thinking / Reasoning khi có cờ thought === true rõ ràng
+                // (Google CloudCode đính kèm thoughtSignature vào cả text bình thường)
+                if (part.thought === true) {
                   sendFirstChunkIfNeeded();
                   if (part.text) {
                     res.write(`data: ${JSON.stringify({
@@ -744,7 +745,7 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
           const toolCalls: any[] = [];
 
           for (const part of parts) {
-            if (part.thought === true || (part.text && (part.thoughtSignature || part.thought_signature))) {
+            if (part.thought === true) {
               if (part.text) {
                 reasoningText += part.text;
               }
@@ -763,6 +764,12 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
                 }
               });
             }
+          }
+
+          // Fallback an toàn: Nếu contentText rỗng nhưng có reasoningText (do nhầm lẫn), chuyển sang contentText
+          if (!contentText && reasoningText) {
+            contentText = reasoningText;
+            reasoningText = '';
           }
 
           const promptTokens = data.usageMetadata?.promptTokenCount || 0;
