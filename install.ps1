@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Script Cài Đặt Tự Động Switch Google Cho Windows PowerShell (1-Click Install)
 # irm https://raw.githubusercontent.com/kipkip11/switch-google/main/install.ps1 | iex
 # ==============================================================================
@@ -23,10 +23,36 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 $nodeVer = node -v
 Write-Host "ℹ Đã phát hiện Node.js phiên bản: $nodeVer" -ForegroundColor Cyan
 
-# 2. Chuẩn bị thư mục cài đặt
+# 2. Chuẩn bị thư mục cài đặt và giải phóng tiến trình cũ
 $targetDir = "$env:USERPROFILE\.switch-google\app"
 $zipPath = "$env:TEMP\switch-google-main.zip"
 $extractTemp = "$env:TEMP\switch-google-extract"
+
+Write-Host "⏳ Đang kiểm tra và giải phóng các tiến trình cũ (nếu đang chạy)..." -ForegroundColor Cyan
+# Thử tắt daemon nếu đã có phiên bản cũ
+if (Test-Path "$targetDir\dist\cli.js") {
+    try {
+        & node "$targetDir\dist\cli.js" daemon stop *>$null
+    } catch {}
+}
+
+# Tắt triệt để bất kỳ tiến trình node nào đang chạy switch-google để tránh khóa file (file lock) trên Windows
+try {
+    Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -like "*switch-google*" -or $_.CommandLine -like "*1909*" -or $_.CommandLine -like "*dist\cli.js*"
+    } | ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    try {
+        Get-WmiObject Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            $_.CommandLine -like "*switch-google*" -or $_.CommandLine -like "*1909*" -or $_.CommandLine -like "*dist\cli.js*"
+        } | ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    } catch {}
+}
+Start-Sleep -Milliseconds 800
 
 Write-Host "⏳ Đang tải mã nguồn mới nhất từ GitHub..." -ForegroundColor Cyan
 try {
@@ -38,16 +64,39 @@ try {
 }
 
 Write-Host "⏳ Đang giải nén mã nguồn vào $targetDir..." -ForegroundColor Cyan
-if (Test-Path $extractTemp) { Remove-Item -Recurse -Force $extractTemp }
+if (Test-Path $extractTemp) { Remove-Item -Recurse -Force $extractTemp -ErrorAction SilentlyContinue }
 Expand-Archive -Path $zipPath -DestinationPath $extractTemp -Force
 
 if (-not (Test-Path "$env:USERPROFILE\.switch-google")) {
     New-Item -ItemType Directory -Path "$env:USERPROFILE\.switch-google" -Force | Out-Null
 }
-if (Test-Path $targetDir) { Remove-Item -Recurse -Force $targetDir }
-Move-Item -Path "$extractTemp\switch-google-main" -Destination $targetDir -Force
-Remove-Item -Force $zipPath
-Remove-Item -Recurse -Force $extractTemp
+if (-not (Test-Path $targetDir)) {
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+}
+
+# Sao chép đè file với cơ chế retry thông minh
+$sourcePath = "$extractTemp\switch-google-main\*"
+$maxRetries = 3
+$copied = $false
+
+for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+    try {
+        Copy-Item -Path $sourcePath -Destination $targetDir -Recurse -Force -ErrorAction Stop
+        $copied = $true
+        break
+    } catch {
+        if ($attempt -lt $maxRetries) {
+            Write-Host "⚠ File đang được giải phóng, thử lại lần $attempt..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 1
+        } else {
+            Write-Host "✗ Không thể sao chép file vào $targetDir: $($_.Exception.Message)" -ForegroundColor Red
+            exit 1
+        }
+    }
+}
+
+Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force $extractTemp -ErrorAction SilentlyContinue
 
 # 3. Cài đặt dependencies
 Write-Host "⏳ Đang cài đặt thư viện phụ thuộc (npm install)..." -ForegroundColor Cyan
