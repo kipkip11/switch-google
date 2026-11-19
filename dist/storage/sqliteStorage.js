@@ -9,13 +9,15 @@ const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
 const crypto_1 = __importDefault(require("crypto"));
 let DatabaseSyncClass = null;
-try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const sqliteMod = require('node:sqlite');
-    DatabaseSyncClass = sqliteMod.DatabaseSync;
-}
-catch (_) {
-    // Node.js version < 22.5.0 (Sẽ dùng FallbackSqliteDb)
+if (!process.env.TEST_FALLBACK_SQLITE) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const sqliteMod = require('node:sqlite');
+        DatabaseSyncClass = sqliteMod.DatabaseSync;
+    }
+    catch (_) {
+        // Node.js version < 22.5.0 (Sẽ dùng FallbackSqliteDb)
+    }
 }
 /**
  * Fallback Database Engine cho các phiên bản Node.js < 22.5.0
@@ -87,9 +89,10 @@ class FallbackSqliteDb {
                         email: args[1],
                         type: args[2],
                         api_key: args[3],
-                        tokens_json: args[4],
-                        created_at: args[5],
-                        updated_at: args[6]
+                        cookies: args[4] || null,
+                        tokens_json: args[5],
+                        created_at: args[6],
+                        updated_at: args[7]
                     };
                     this.persist();
                     return { changes: 1 };
@@ -248,15 +251,119 @@ class SqliteStorage {
             fs_1.default.mkdirSync(this.baseDir, { recursive: true, mode: 0o700 });
         }
         this.dbPath = path_1.default.join(this.baseDir, 'switch_google.sqlite');
+        let fallbackDataToMigrate = null;
         if (DatabaseSyncClass) {
-            this.db = new DatabaseSyncClass(this.dbPath);
-            this.isNativeSqlite = true;
+            // Kiểm tra file hiện tại có phải là SQLite binary thật sự không
+            let isBinarySqlite = false;
+            if (fs_1.default.existsSync(this.dbPath) && fs_1.default.statSync(this.dbPath).size > 0) {
+                try {
+                    const fd = fs_1.default.openSync(this.dbPath, 'r');
+                    const header = Buffer.alloc(16);
+                    fs_1.default.readSync(fd, header, 0, 16, 0);
+                    fs_1.default.closeSync(fd);
+                    if (header.toString('utf8', 0, 15) === 'SQLite format 3') {
+                        isBinarySqlite = true;
+                    }
+                }
+                catch (_) { }
+                if (!isBinarySqlite) {
+                    // File hiện tại không phải SQLite binary (có thể là file JSON của FallbackSqliteDb)
+                    try {
+                        const raw = fs_1.default.readFileSync(this.dbPath, 'utf8');
+                        if (raw.trim().startsWith('{')) {
+                            fallbackDataToMigrate = JSON.parse(raw);
+                        }
+                    }
+                    catch (_) { }
+                    // Sao lưu file không tương thích và khởi tạo file SQLite binary mới
+                    try {
+                        fs_1.default.copyFileSync(this.dbPath, this.dbPath + '.fallback.bak');
+                        fs_1.default.unlinkSync(this.dbPath);
+                    }
+                    catch (_) { }
+                }
+            }
+            try {
+                this.db = new DatabaseSyncClass(this.dbPath);
+                this.isNativeSqlite = true;
+            }
+            catch (err) {
+                console.error('[SQLite] Lỗi mở DatabaseSync, tự động dọn dẹp và thử lại:', err);
+                try {
+                    if (fs_1.default.existsSync(this.dbPath)) {
+                        fs_1.default.copyFileSync(this.dbPath, this.dbPath + '.corrupt.bak');
+                        fs_1.default.unlinkSync(this.dbPath);
+                    }
+                    this.db = new DatabaseSyncClass(this.dbPath);
+                    this.isNativeSqlite = true;
+                }
+                catch (_) {
+                    this.db = new FallbackSqliteDb(this.dbPath);
+                    this.isNativeSqlite = false;
+                }
+            }
         }
         else {
             this.db = new FallbackSqliteDb(this.dbPath);
             this.isNativeSqlite = false;
         }
         this.initTables();
+        // Nếu có dữ liệu từ Fallback JSON cần migrate sang Native SQLite
+        if (fallbackDataToMigrate && this.isNativeSqlite) {
+            try {
+                if (fallbackDataToMigrate.profiles) {
+                    for (const p of Object.values(fallbackDataToMigrate.profiles)) {
+                        const tokens = typeof p.tokens === 'object' && p.tokens !== null
+                            ? p.tokens
+                            : (p.tokens_json ? JSON.parse(p.tokens_json) : {});
+                        this.saveProfile({
+                            name: p.name,
+                            email: p.email || p.name,
+                            type: p.type || 'oauth',
+                            apiKey: p.api_key || p.apiKey || undefined,
+                            cookies: p.cookies || undefined,
+                            tokens,
+                            createdAt: p.created_at || p.createdAt || Date.now(),
+                            updatedAt: p.updated_at || p.updatedAt || Date.now()
+                        });
+                    }
+                }
+                if (fallbackDataToMigrate.virtual_keys) {
+                    for (const k of Object.values(fallbackDataToMigrate.virtual_keys)) {
+                        this.saveApiKey({
+                            id: k.id,
+                            name: k.name,
+                            key: k.key,
+                            createdAt: k.created_at || k.createdAt || Date.now(),
+                            lastUsedAt: k.last_used_at || k.lastUsedAt || undefined
+                        });
+                    }
+                }
+                if (fallbackDataToMigrate.model_combos) {
+                    for (const c of Object.values(fallbackDataToMigrate.model_combos)) {
+                        const models = typeof c.models_json === 'string'
+                            ? JSON.parse(c.models_json)
+                            : (Array.isArray(c.models) ? c.models : []);
+                        this.saveCombo({
+                            id: c.id,
+                            name: c.name,
+                            strategy: c.strategy || 'fallback',
+                            models,
+                            createdAt: c.created_at || c.createdAt || Date.now()
+                        });
+                    }
+                }
+                if (fallbackDataToMigrate.settings) {
+                    for (const [key, val] of Object.entries(fallbackDataToMigrate.settings)) {
+                        this.setSetting(key, String(val));
+                    }
+                }
+                console.log('[SQLite] Đã tự động khôi phục và chuyển đổi toàn bộ dữ liệu từ Fallback JSON sang SQLite binary thành công!');
+            }
+            catch (migErr) {
+                console.error('[SQLite] Lỗi khi chuyển đổi dữ liệu từ Fallback JSON:', migErr);
+            }
+        }
         this.migrateFromLegacyIfNeeded();
     }
     static getInstance(customBaseDir) {
@@ -442,6 +549,7 @@ class SqliteStorage {
             email: r.email,
             type: r.type,
             apiKey: r.api_key || undefined,
+            cookies: r.cookies || undefined,
             tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
             createdAt: r.created_at,
             updatedAt: r.updated_at
