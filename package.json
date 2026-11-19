@@ -1,6 +1,6 @@
 {
   "name": "switch-google",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Multi-account Google Profile & OAuth Manager with local token server",
   "main": "dist/cli.js",
   "bin": {

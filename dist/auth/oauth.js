@@ -50,7 +50,7 @@ class GoogleOAuthHandler {
         const oauth2Client = this.getClient();
         const authUrl = oauth2Client.generateAuthUrl({
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account consent',
             scope: this.config.scopes
         });
         return new Promise((resolve, reject) => {

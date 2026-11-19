@@ -150,7 +150,7 @@ async function callUpstreamGoogle(creds, actualModel, geminiBody, stream) {
             // Tiếp tục fallback sang generativelanguage bên dưới nếu bị 401/403
         }
     }
-    // OAuth Account hoặc Antigravity Token fallback: gọi generativelanguage với Bearer token
+    // OAuth Account hoặc Antigravity Token: thử daily-cloudcode-pa trước, nếu bị chặn 403 (TOS_VIOLATION) hoặc 401 thì tự động chuyển sang generativelanguage
     if (!isAntigravityToken) {
         try {
             const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
@@ -172,18 +172,14 @@ async function callUpstreamGoogle(creds, actualModel, geminiBody, stream) {
             });
             if (res.ok)
                 return res;
-            if (res.status !== 403 && res.status !== 401) {
-                const errText = await res.text();
-                const err = new Error(errText);
-                err.status = res.status;
-                throw err;
-            }
+            // Bất kể mã lỗi gì từ cloudcode (403 TOS_VIOLATION, 401, 429), chuyển tiếp sang generativelanguage
+            console.warn(`[OAuth Fallback] Tài khoản [${creds.profile}] bị CloudCode từ chối (${res.status}). Đang tự động chuyển tiếp sang Generative Language API...`);
         }
         catch (err) {
-            // tiếp tục fallback
+            console.warn(`[OAuth Fallback] Lỗi kết nối CloudCode cho [${creds.profile}]: ${err.message}. Tự động fallback sang Generative Language...`);
         }
     }
-    // Fallback to generativelanguage with OAuth Bearer token
+    // Tự động gọi generativelanguage bằng OAuth Bearer token
     const glModel = resolveGenerativeLanguageModel(actualModel);
     const glUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
     const glRes = await fetch(glUrl, {
