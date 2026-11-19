@@ -1,6 +1,13 @@
-import { findChromiumExecutable, connectCdp } from '../src/services/webAuthAutomator';
+import { findChromiumExecutable, connectCdp, getFreePort } from '../src/services/webAuthAutomator';
 
 describe('webAuthAutomator', () => {
+  it('should allocate a valid free port dynamically', async () => {
+    const port = await getFreePort();
+    expect(typeof port).toBe('number');
+    expect(port).toBeGreaterThan(1024);
+    expect(port).toBeLessThan(65536);
+  });
+
   it('should find a valid chromium executable or return null gracefully', () => {
     const execPath = findChromiumExecutable();
     if (execPath) {

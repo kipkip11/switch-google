@@ -1,4 +1,5 @@
 import http from 'http';
+import net from 'net';
 import crypto from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
@@ -216,6 +217,21 @@ export async function connectCdp(wsUrl: string): Promise<CdpClient> {
 }
 
 /**
+ * Tìm cổng còn trống an toàn trên localhost (127.0.0.1) được cấp phát động bởi OS
+ */
+export async function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const port = (server.address() as net.AddressInfo).port;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+/**
  * Đăng nhập tự động vào Gemini Web qua Chrome CDP:
  * 1. Khởi chạy Chrome với isolate data-dir và mở cổng CDP
  * 2. Mở sẵn trang gemini.google.com để người dùng đăng nhập bằng Google
@@ -229,8 +245,8 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
     throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
   }
 
-  // Chọn cổng CDP ngẫu nhiên an toàn (9330-9380)
-  const cdpPort = 9330 + Math.floor(Math.random() * 50);
+  // Cấp phát cổng CDP độc lập, đảm bảo 100% không trùng với tiến trình khác
+  const cdpPort = await getFreePort();
   const tempProfileDir = path.join(os.tmpdir(), `switch_google_cdp_${Date.now()}`);
   fs.mkdirSync(tempProfileDir, { recursive: true });
 
@@ -244,6 +260,7 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
 
     const launchArgs = [
       `--remote-debugging-port=${cdpPort}`,
+      `--remote-debugging-address=127.0.0.1`,
       `--user-data-dir=${tempProfileDir}`,
       '--no-first-run',
       '--no-default-browser-check',

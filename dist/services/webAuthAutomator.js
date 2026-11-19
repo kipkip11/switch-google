@@ -38,8 +38,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.findChromiumExecutable = findChromiumExecutable;
 exports.connectCdp = connectCdp;
+exports.getFreePort = getFreePort;
 exports.autoCaptureGeminiWebSession = autoCaptureGeminiWebSession;
 const http_1 = __importDefault(require("http"));
+const net_1 = __importDefault(require("net"));
 const crypto_1 = __importDefault(require("crypto"));
 const child_process_1 = require("child_process");
 const fs_1 = __importDefault(require("fs"));
@@ -228,6 +230,20 @@ async function connectCdp(wsUrl) {
     });
 }
 /**
+ * Tìm cổng còn trống an toàn trên localhost (127.0.0.1) được cấp phát động bởi OS
+ */
+async function getFreePort() {
+    return new Promise((resolve, reject) => {
+        const server = net_1.default.createServer();
+        server.unref();
+        server.on('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+            const port = server.address().port;
+            server.close(() => resolve(port));
+        });
+    });
+}
+/**
  * Đăng nhập tự động vào Gemini Web qua Chrome CDP:
  * 1. Khởi chạy Chrome với isolate data-dir và mở cổng CDP
  * 2. Mở sẵn trang gemini.google.com để người dùng đăng nhập bằng Google
@@ -240,8 +256,8 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
     if (!chromePath) {
         throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
     }
-    // Chọn cổng CDP ngẫu nhiên an toàn (9330-9380)
-    const cdpPort = 9330 + Math.floor(Math.random() * 50);
+    // Cấp phát cổng CDP độc lập, đảm bảo 100% không trùng với tiến trình khác
+    const cdpPort = await getFreePort();
     const tempProfileDir = path_1.default.join(os_1.default.tmpdir(), `switch_google_cdp_${Date.now()}`);
     fs_1.default.mkdirSync(tempProfileDir, { recursive: true });
     let browserProcess = null;
@@ -252,6 +268,7 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             : 'https://gemini.google.com/app';
         const launchArgs = [
             `--remote-debugging-port=${cdpPort}`,
+            `--remote-debugging-address=127.0.0.1`,
             `--user-data-dir=${tempProfileDir}`,
             '--no-first-run',
             '--no-default-browser-check',
