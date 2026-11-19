@@ -73,9 +73,7 @@ class DaemonManager {
                 // VBScript hides window completely (0 = vbHide) and opens browser to port
                 const vbsContent = [
                     'Set WshShell = CreateObject("WScript.Shell")',
-                    `WshShell.Run """${nodeBin}"" """${cliScript}""" serve -p ${port}", 0, False`,
-                    'WScript.Sleep 1500',
-                    `WshShell.Run "http://localhost:${port}"`
+                    `WshShell.Run """${nodeBin}"" """${cliScript}""" serve -p ${port}", 0, False`
                 ].join('\r\n');
                 fs_1.default.writeFileSync(vbsPath, vbsContent, 'utf8');
                 return { success: true, message: `Đã kích hoạt tự khởi động ngầm cùng Windows tại: ${vbsPath}` };
@@ -204,6 +202,7 @@ WantedBy=default.target`;
             detached: true,
             stdio: ['ignore', logStream, logStream],
             cwd: this.appRoot,
+            windowsHide: true,
             env: { ...process.env, PORT: port.toString() }
         });
         child.unref();

@@ -135,7 +135,24 @@ if (-not (Test-Path $npmGlobalDir)) {
 Set-Content -Path "$npmGlobalDir\switch-google.cmd" -Value $cmdContent -Encoding ASCII
 Set-Content -Path "$npmGlobalDir\switch-google.ps1" -Value $ps1Content -Encoding UTF8
 
-# 5. Kích hoạt tự khởi động cùng Windows & Bật server ngầm
+# 5. Cấu hình Windows Firewall cho cổng 1909 (để máy khác trong LAN kết nối mượt mà)
+Write-Host "⏳ Đang kiểm tra và cấu hình Windows Defender Firewall (Port 1909)..." -ForegroundColor Cyan
+try {
+    $existingRule = Get-NetFirewallRule -DisplayName "Switch Google Port 1909" -ErrorAction SilentlyContinue
+    if (-not $existingRule) {
+        New-NetFirewallRule -DisplayName "Switch Google Port 1909" -Direction Inbound -LocalPort 1909 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue | Out-Null
+        Write-Host "✓ Đã mở cổng 1909 trong Windows Firewall cho các máy khác kết nối." -ForegroundColor Green
+    } else {
+        Write-Host "✓ Quy tắc tường lửa Windows Firewall cho cổng 1909 đã sẵn sàng." -ForegroundColor Green
+    }
+} catch {
+    # Thử qua netsh dự phòng nếu cmdlet NetSecurity không có quyền
+    try {
+        netsh advfirewall firewall add rule name="Switch Google Port 1909" dir=in action=allow protocol=TCP localport=1909 *>$null
+    } catch {}
+}
+
+# 6. Kích hoạt tự khởi động cùng Windows & Bật server ngầm
 Write-Host "⏳ Đang kích hoạt tự khởi động cùng Windows và bật server ngầm..." -ForegroundColor Cyan
 try {
     node "$targetDir\dist\cli.js" daemon enable
@@ -144,7 +161,7 @@ try {
     Write-Host "⚠ Không thể tự bật daemon: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
-# 6. Mở trình duyệt Web Dashboard
+# 7. Mở trình duyệt Web Dashboard
 Start-Sleep -Seconds 1
 Start-Process "http://localhost:1909"
 
@@ -155,6 +172,7 @@ Write-Host "====================================================================
 Write-Host ""
 Write-Host "  🌐 Trình duyệt Web Dashboard đã được mở tại: http://localhost:1909" -ForegroundColor Cyan
 Write-Host "  ⚡ Server đang chạy ngầm và sẽ tự bật lại mỗi khi bạn mở máy tính!" -ForegroundColor Yellow
+Write-Host "  🔌 Kết nối từ máy khác qua mạng LAN: http://<IP_MÁY_WINDOWS>:1909/v1" -ForegroundColor Green
 Write-Host "  ⌨️ Từ nay bạn có thể mở PowerShell ở bất cứ đâu và gõ:" -ForegroundColor White
 Write-Host "     • switch-google serve    : Bật Web Server" -ForegroundColor Gray
 Write-Host "     • switch-google update   : Cập nhật bản mới" -ForegroundColor Gray

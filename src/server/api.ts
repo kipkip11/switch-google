@@ -472,7 +472,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   });
 
   // Mount OpenAI-compatible Gateway (/v1/chat/completions, /v1/models) with account rotation & auto-failover
-  app.use('/v1', createOpenAiRouter(manager, rotator));
+  app.use('/v1', createOpenAiRouter(manager, rotator, port));
 
   // Add profile via API Key (Google AI Studio Gemini Key)
   app.post('/api/profiles/apikey', (req: Request, res: Response) => {

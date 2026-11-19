@@ -58,61 +58,72 @@ async function callUpstreamGoogle(creds, actualModel, geminiBody, stream) {
         return res;
     }
     if (isAntigravityToken) {
-        const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
-            'Authorization': `Bearer ${creds.access_token}`
-        };
-        const requestPayload = {
-            project: 'aicode-consumers',
-            model: actualModel,
-            userAgent: 'antigravity',
-            request: geminiBody
-        };
-        const res = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(requestPayload)
-        });
-        if (!res.ok) {
-            const errText = await res.text();
-            const err = new Error(errText);
-            err.status = res.status;
-            throw err;
+        try {
+            const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                'Authorization': `Bearer ${creds.access_token}`
+            };
+            const requestPayload = {
+                project: 'aicode-consumers',
+                model: actualModel,
+                userAgent: 'antigravity',
+                request: geminiBody
+            };
+            const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestPayload)
+            });
+            if (res.ok)
+                return res;
+            if (res.status !== 403 && res.status !== 401) {
+                const errText = await res.text();
+                const err = new Error(errText);
+                err.status = res.status;
+                throw err;
+            }
         }
-        return res;
-    }
-    // OAuth Account: thử daily-cloudcode-pa trước, nếu 403 / 401 thì fallback sang generativelanguage
-    try {
-        const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
-            'Authorization': `Bearer ${creds.access_token}`
-        };
-        const requestPayload = {
-            project: 'aicode-consumers',
-            model: actualModel,
-            userAgent: 'antigravity',
-            request: geminiBody
-        };
-        const res = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(requestPayload)
-        });
-        if (res.ok)
-            return res;
-        if (res.status !== 403 && res.status !== 401) {
-            const errText = await res.text();
-            const err = new Error(errText);
-            err.status = res.status;
-            throw err;
+        catch (err) {
+            if (err.status && err.status !== 403 && err.status !== 401) {
+                throw err;
+            }
+            // Tiếp tục fallback sang generativelanguage bên dưới nếu bị 401/403
         }
     }
-    catch (err) {
-        // tiếp tục fallback
+    // OAuth Account hoặc Antigravity Token fallback: gọi generativelanguage với Bearer token
+    if (!isAntigravityToken) {
+        try {
+            const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                'Authorization': `Bearer ${creds.access_token}`
+            };
+            const requestPayload = {
+                project: 'aicode-consumers',
+                model: actualModel,
+                userAgent: 'antigravity',
+                request: geminiBody
+            };
+            const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestPayload)
+            });
+            if (res.ok)
+                return res;
+            if (res.status !== 403 && res.status !== 401) {
+                const errText = await res.text();
+                const err = new Error(errText);
+                err.status = res.status;
+                throw err;
+            }
+        }
+        catch (err) {
+            // tiếp tục fallback
+        }
     }
     // Fallback to generativelanguage with OAuth Bearer token
     const glModel = resolveGenerativeLanguageModel(actualModel);
@@ -278,8 +289,22 @@ function convertMessagesToGemini(messages) {
     };
     return { systemInstruction, contents };
 }
-function createOpenAiRouter(manager, rotator) {
+function createOpenAiRouter(manager, rotator, port = 1909) {
     const router = (0, express_1.Router)();
+    // Health check endpoint for 3rd-party integration verification
+    router.get('/health', (req, res) => {
+        const profiles = manager.listProfiles();
+        const active = manager.getActiveProfileName();
+        res.json({
+            status: 'healthy',
+            version: '1.1.1',
+            totalProfiles: profiles.length,
+            activeProfile: active,
+            hasProfiles: profiles.length > 0,
+            openAiProxyUrl: `http://localhost:${port}/v1`,
+            help: profiles.length === 0 ? 'Vui lòng mở http://localhost:1909 để thêm tài khoản Google hoặc API Key trước khi sử dụng.' : 'Hệ thống sẵn sàng phục vụ bên thứ 3.'
+        });
+    });
     // Authentication Middleware for Virtual API Keys
     router.use((req, res, next) => {
         const keys = manager.getApiKeys();

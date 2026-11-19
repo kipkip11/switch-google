@@ -454,7 +454,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
         res.json({ success: true, message: 'Model Combo deleted' });
     });
     // Mount OpenAI-compatible Gateway (/v1/chat/completions, /v1/models) with account rotation & auto-failover
-    app.use('/v1', (0, openaiAdapter_1.createOpenAiRouter)(manager, rotator));
+    app.use('/v1', (0, openaiAdapter_1.createOpenAiRouter)(manager, rotator, port));
     // Add profile via API Key (Google AI Studio Gemini Key)
     app.post('/api/profiles/apikey', (req, res) => {
         try {
