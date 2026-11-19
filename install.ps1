@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Script Cài Đặt Tự Động Switch Google Cho Windows PowerShell (1-Click Install)
 # irm https://raw.githubusercontent.com/kipkip11/switch-google/main/install.ps1 | iex
 # ==============================================================================

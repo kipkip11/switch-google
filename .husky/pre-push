@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+echo "🛡️  [ECC Gate] Đang thực thi cơ chế kiểm soát chất lượng Pre-Push..."
+
+cd "$(git rev-parse --show-toplevel)"
+
+# 1. Type Check
+echo "🔍 [1/4] Kiểm tra TypeScript (Type Check)..."
+npm run type-check
+
+# 2. Test Engine Native
+echo "🧪 [2/4] Kiểm tra Unit Tests (Native Engine)..."
+npm test
+
+# 3. Test Forced Fallback Engine
+echo "🧪 [3/4] Kiểm tra Unit Tests (Fallback SQLite Engine)..."
+TEST_FALLBACK_SQLITE=1 npm test
+
+# 4. Build Test
+echo "🏗️  [4/4] Kiểm tra quy trình Build..."
+npm run build
+
+echo "✅ [ECC Gate] Toàn bộ kiểm thử đều ĐẠT! Cho phép đẩy lên GitHub."
+exit 0

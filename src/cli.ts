@@ -91,6 +91,26 @@ program
     }
   });
 
+// Command: login-web (Tự động mở trình duyệt lấy Cookie Web Mode)
+program
+  .command('login-web [profile_name]')
+  .description('Đăng nhập Google tự động để kích hoạt Gemini Web Mode (Vượt chặn Antigravity)')
+  .action(async (profileName?: string) => {
+    try {
+      console.log('\n🚀 Đang mở trình duyệt để xác thực tài khoản Google Gemini Web...');
+      console.log('Vui lòng đăng nhập tài khoản Google của bạn trên cửa sổ vừa mở.');
+      const { autoCaptureGeminiWebSession } = await import('./services/webAuthAutomator');
+      const captured = await autoCaptureGeminiWebSession(180000);
+      const targetProfile = profileName?.trim() || captured.email;
+      const prof = manager.addWebSessionProfile(targetProfile, captured.cookies, captured.email);
+      console.log(`\n✓ Đã kích hoạt Gemini Web Mode cho [${prof.name}] (${prof.email}) thành công!`);
+      process.exit(0);
+    } catch (err: any) {
+      console.error(`\n✗ Lỗi: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
 // Command: list
 program
   .command('list')

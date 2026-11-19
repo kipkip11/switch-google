@@ -6,6 +6,7 @@ import { AccountRotator } from '../profiles/rotator';
 import { createOpenAiRouter } from './openaiAdapter';
 import { usageTracker } from '../usage/tracker';
 import { DaemonManager } from '../services/daemon';
+import { autoCaptureGeminiWebSession } from '../services/webAuthAutomator';
 
 export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   const app = express();
@@ -529,6 +530,24 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       }
       const saved = manager.addWebSessionProfile(profile.trim(), cookies.trim(), email?.trim());
       res.json(saved);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Tự động mở Google Login và bắt Cookie Gemini Web Mode (1-Click OAuth Web Mode)
+  app.post('/api/login/web', async (req: Request, res: Response) => {
+    try {
+      const { profile } = req.body || {};
+      const captured = await autoCaptureGeminiWebSession(180000);
+      const targetProfile = profile?.trim() || captured.email;
+      const saved = manager.addWebSessionProfile(targetProfile, captured.cookies, captured.email);
+      res.json({
+        success: true,
+        profile: saved,
+        email: captured.email,
+        message: 'Đã tự động xác thực và kích hoạt Gemini Web Mode thành công!'
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

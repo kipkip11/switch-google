@@ -320,6 +320,7 @@ export class AccountRotator {
       email: tokenData.email,
       type: tokenData.type,
       apiKey: tokenData.apiKey,
+      cookies: (tokenData as any).cookies,
       access_token: tokenData.access_token,
       expiry_date: tokenData.expiry_date
     };

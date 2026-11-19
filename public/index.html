@@ -1889,19 +1889,33 @@
 
       <div style="display: flex; gap: 6px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
         <button class="btn-action primary" id="tab-modal-oauth" onclick="switchModalTab('oauth')">1. Google OAuth</button>
+        <button class="btn-action" id="tab-modal-web" onclick="switchModalTab('web')">⚡ Web Mode Tự Động</button>
         <button class="btn-action" id="tab-modal-key" onclick="switchModalTab('key')">2. Gemini API Key</button>
-        <button class="btn-action" id="tab-modal-cookie" onclick="switchModalTab('cookie')">3. 🍪 Gemini Web Cookie</button>
+        <button class="btn-action" id="tab-modal-cookie" onclick="switchModalTab('cookie')">3. 🍪 Nhập Cookie</button>
         <button class="btn-action" id="tab-modal-token" onclick="switchModalTab('token')">4. Nhập Token</button>
       </div>
 
       <!-- Tab OAuth -->
       <div id="m-pane-oauth" style="text-align: center; padding: 16px 0;">
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
-          Đăng nhập 1-click bằng tài khoản Google của bạn. Switch sẽ tự động lưu và khởi tạo một Cổng RJ45 mới.
+          Đăng nhập 1-click bằng tài khoản Google CloudCode/Antigravity của bạn.
         </p>
         <button class="btn-add-account" style="margin: 0 auto; padding: 10px 24px; font-size: 0.9rem;" onclick="executeAddOAuth()">
-          Mở Trình Duyệt Đăng Nhập Google
+          Mở Trình Duyệt Đăng Nhập Google (OAuth)
         </button>
+      </div>
+
+      <!-- Tab Web Mode Auto (Vượt chặn Antigravity) -->
+      <div id="m-pane-web" style="display: none; text-align: center; padding: 16px 0;">
+        <p style="font-size: 0.85rem; color: #38bdf8; margin-bottom: 16px;">
+          🔥 <b>Vượt chặn Antigravity 100%:</b> Hệ thống sẽ tự mở trình duyệt Chrome để bạn đăng nhập Google, sau đó tự động bắt lấy session và chuyển sang Gemini Web Mode mà không cần copy cookie thủ công!
+        </p>
+        <button class="btn-add-account" id="btn-web-login" style="margin: 0 auto; padding: 10px 24px; font-size: 0.9rem; background: linear-gradient(135deg, #0ea5e9, #2563eb);" onclick="executeAddWebAuto()">
+          ⚡ Đăng Nhập Google Tự Động (Web Mode)
+        </button>
+        <div id="web-login-status" style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); display: none;">
+          Đang chờ bạn đăng nhập Google trên trình duyệt...
+        </div>
       </div>
 
       <!-- Tab Key -->
@@ -1993,10 +2007,10 @@
       document.getElementById('modal-add-port').classList.remove('open');
     }
     function switchModalTab(tabId) {
-      ['oauth', 'key', 'cookie', 'token'].forEach(t => {
+      ['oauth', 'web', 'key', 'cookie', 'token'].forEach(t => {
         const pane = document.getElementById(`m-pane-${t}`);
         const btn = document.getElementById(`tab-modal-${t}`);
-        if (pane) pane.style.display = (t === tabId ? (t === 'oauth' ? 'block' : 'flex') : 'none');
+        if (pane) pane.style.display = (t === tabId ? (t === 'oauth' || t === 'web' ? 'block' : 'flex') : 'none');
         if (btn) {
           if (t === tabId) btn.classList.add('primary');
           else btn.classList.remove('primary');
@@ -3093,6 +3107,40 @@
     }
 
     // --- ADD PORT HANDLERS (MODAL) ---
+    async function executeAddWebAuto() {
+      const btn = document.getElementById('btn-web-login');
+      const statusDiv = document.getElementById('web-login-status');
+      if (btn) btn.disabled = true;
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerText = 'Đang mở Chrome... Hãy đăng nhập tài khoản Google của bạn trên cửa sổ vừa mở.';
+      }
+      toast('Đang khởi chạy trình duyệt xác thực Google Web...');
+
+      try {
+        const res = await fetch('/api/login/web', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          toast(`✓ ${data.message || 'Đăng nhập Web Mode thành công!'} (${data.email})`);
+          closeAddModal();
+          fetchSwitchStatus();
+        } else {
+          const err = await res.json();
+          toast(`✗ Lỗi: ${err.error || 'Xác thực thất bại'}`);
+        }
+      } catch (e) {
+        toast('✗ Lỗi kết nối server khi tự động đăng nhập Web');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (statusDiv) statusDiv.style.display = 'none';
+      }
+    }
+
     async function executeAddOAuth() {
       toast('Đang mở trình duyệt đăng nhập Google...', 5000);
       try {
