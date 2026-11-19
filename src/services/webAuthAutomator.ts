@@ -315,19 +315,82 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
         throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
       }
 
-      // 2. Lấy toàn bộ cookies
+      // 2. Lấy toàn bộ cookies từ Chrome CDP
       try {
         const cookiesRes = await cdpClient.send('Network.getAllCookies');
         if (cookiesRes && Array.isArray(cookiesRes.cookies)) {
           for (const c of cookiesRes.cookies) {
-            if (c.domain.includes('google.com')) {
+            if (c.domain && (c.domain.includes('google.com') || c.domain.includes('google'))) {
               detectedCookies[c.name] = c.value;
             }
           }
         }
       } catch (_) {}
 
-      // Kiểm tra có các cookie phiên cốt lõi chưa
+      // 3. Phương thức 1 (Tối ưu nhất): Đọc trực tiếp SNlM0e token và Email từ tab Gemini đang mở
+      let inPageSn = '';
+      try {
+        const pageTargets: any[] = await new Promise((resTargets) => {
+          const req = http.get(`http://127.0.0.1:${cdpPort}/json/list`, (res) => {
+            let data = '';
+            res.on('data', (d) => (data += d));
+            res.on('end', () => {
+              try {
+                resTargets(JSON.parse(data));
+              } catch (_) {
+                resTargets([]);
+              }
+            });
+          });
+          req.on('error', () => resTargets([]));
+          req.setTimeout(800, () => req.destroy());
+        });
+
+        const geminiTab = pageTargets.find(
+          (t: any) => t.type === 'page' && t.url && t.url.includes('gemini.google.com')
+        );
+
+        if (geminiTab && geminiTab.webSocketDebuggerUrl) {
+          let pageCdp: CdpClient | null = null;
+          try {
+            pageCdp = await connectCdp(geminiTab.webSocketDebuggerUrl);
+            const evalRes = await pageCdp.send('Runtime.evaluate', {
+              expression: `(() => {
+                try {
+                  const wiz = window.WIZ_global_data || {};
+                  const sn = wiz.SNlM0e || (document.body.innerHTML.match(/"SNlM0e":"(.*?)"/) || [])[1] || (document.body.innerHTML.match(/"thykhd":"(.*?)"/) || [])[1] || "";
+                  let email = "";
+                  try {
+                    const m = document.body.innerHTML.match(/([a-zA-Z0-9._%+-]+@gmail\\.com)/i);
+                    if (m) email = m[1];
+                  } catch (_) {}
+                  return JSON.stringify({ sn, email, url: window.location.href });
+                } catch (e) {
+                  return JSON.stringify({ error: e.message });
+                }
+              })()`,
+              returnByValue: true
+            });
+
+            if (evalRes && evalRes.result && evalRes.result.value) {
+              const info = JSON.parse(evalRes.result.value);
+              if (info && info.sn) {
+                inPageSn = info.sn;
+              }
+              if (info && info.email && !detectedEmail) {
+                detectedEmail = info.email;
+              }
+            }
+          } catch (_) {
+          } finally {
+            if (pageCdp) {
+              try { pageCdp.close(); } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 4. Kiểm tra có cookie phiên cốt lõi chưa
       const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['SID'];
 
       if (sid) {
@@ -336,11 +399,18 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
           .map(([k, v]) => `${k}=${v}`)
           .join('; ');
 
-        // Thử lấy SNlM0e token xác thực
-        try {
-          const snlm0e = await getSNlM0eToken(cookieString);
-          if (snlm0e) {
-            // Lấy email thông qua trang account Google nếu có
+        let finalSnlm0e = inPageSn;
+
+        // Nếu trong trang chưa lấy được, thử fallback qua getSNlM0eToken
+        if (!finalSnlm0e) {
+          try {
+            finalSnlm0e = await getSNlM0eToken(cookieString);
+          } catch (_) {}
+        }
+
+        if (finalSnlm0e) {
+          // Lấy email thông qua trang account Google nếu chưa có
+          if (!detectedEmail) {
             try {
               const targets = await cdpClient.send('Target.getTargets');
               const geminiTarget = targets.targetInfos.find((t: any) => t.url.includes('google.com'));
@@ -351,38 +421,24 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
                 }
               }
             } catch (_) {}
-
-            if (!detectedEmail) {
-              // Thử lấy email từ myaccount.google.com qua fetch với cookie
-              try {
-                const accRes = await fetch('https://myaccount.google.com/', {
-                  headers: { 'Cookie': cookieString, 'User-Agent': 'Mozilla/5.0' }
-                });
-                const accHtml = await accRes.text();
-                const m = accHtml.match(/([a-zA-Z0-9._%+-]+@gmail\.com)/i);
-                if (m) detectedEmail = m[1];
-              } catch (_) {}
-            }
-
-            if (!detectedEmail && targetEmail) {
-              detectedEmail = targetEmail;
-            }
-            if (!detectedEmail) {
-              detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
-            }
-
-            return {
-              email: detectedEmail,
-              cookies: cookieString,
-              snlm0e
-            };
           }
-        } catch (_) {
-          // Chưa đăng nhập xong hoặc chưa vào app, tiếp tục đợi
+
+          if (!detectedEmail && targetEmail) {
+            detectedEmail = targetEmail;
+          }
+          if (!detectedEmail) {
+            detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
+          }
+
+          return {
+            email: detectedEmail,
+            cookies: cookieString,
+            snlm0e: finalSnlm0e
+          };
         }
       }
 
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1000));
     }
 
     throw new Error('Hết thời gian chờ đăng nhập Google Gemini (3 phút). Vui lòng thử lại.');
