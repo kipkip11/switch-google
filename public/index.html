@@ -2144,6 +2144,7 @@
                           p.isDisabled ? 'state-down' : '';
 
         const statusLabel = p.isDisabled ? 'Đã ngắt cáp' :
+                            p.isUpgradingWeb ? '🔄 Đang tự chuyển Web Mode...' :
                             (p.isBlockedAntigravity && p.type === 'oauth') ? '⚠️ Bị Chặn Antigravity' :
                             p.linkStatus === 'banned' ? 'Banned (TOS)' :
                             p.linkStatus === 'cooldown' ? `Cooldown (${p.cooldownRemainingSeconds}s)` :
@@ -2176,13 +2177,18 @@
               <span style="color: ${p.isDisabled ? 'var(--text-muted)' : (p.isBlockedAntigravity && p.type === 'oauth') ? '#f87171' : p.linkStatus === 'up' ? '#34d399' : p.linkStatus === 'banned' ? '#f87171' : '#fbbf24'};">${statusLabel}</span>
             </div>
 
-            ${p.isBlockedAntigravity && p.type === 'oauth' ? `
+            ${p.isUpgradingWeb ? `
+              <div style="margin: 6px 0 2px 0; font-size: 0.72rem; color: #38bdf8; font-weight: 700; text-align: center;">
+                <span class="micro-led act-pulse" style="display: inline-block; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; margin-right: 4px;"></span>
+                Đang tự động chuyển Web Mode...
+              </div>
+            ` : (p.isBlockedAntigravity && p.type === 'oauth' ? `
               <div style="margin: 6px 0 2px 0;">
                 <button class="btn-action primary" style="width: 100%; padding: 4px 6px; font-size: 0.7rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); border: none; border-radius: 4px; font-weight: 700;" onclick="upgradeToWebMode('${p.profile}')" title="Kích hoạt Chrome tự động lấy Cookie để vượt chặn Antigravity">
                   ⚡ Chuyển sang Web Mode
                 </button>
               </div>
-            ` : ''}
+            ` : '')}
 
             <div class="mini-switch-row" style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span class="mini-switch-text">${p.isDisabled ? 'Off' : 'Active'}</span>

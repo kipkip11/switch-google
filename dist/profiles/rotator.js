@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountRotator = void 0;
 const tracker_1 = require("../usage/tracker");
@@ -8,6 +41,7 @@ class AccountRotator {
     currentIndex = 0;
     stats = new Map();
     disabledProfiles = new Set();
+    upgradingProfiles = new Set();
     currentlyServingAccount = null;
     lastServedAt = 0;
     // Turn management (Số lượt gọi và token cho mỗi vòng)
@@ -17,6 +51,45 @@ class AccountRotator {
     constructor(manager) {
         this.manager = manager;
         this.sqlite = manager.getStorage().getSqlite();
+    }
+    async triggerAutoUpgradeToWeb(profileName) {
+        if (this.upgradingProfiles.has(profileName)) {
+            return;
+        }
+        const raw = this.manager.getRawProfile(profileName);
+        if (!raw || raw.type === 'web_session') {
+            return;
+        }
+        this.upgradingProfiles.add(profileName);
+        console.log(`[Auto-Recovery] 🚀 Phát hiện tài khoản [${profileName}] bị chặn Antigravity. Đang tự động kích hoạt chuyển sang Gemini Web Mode...`);
+        // Chạy ngầm không chặn luồng chính
+        (async () => {
+            try {
+                const { autoCaptureGeminiWebSession } = await Promise.resolve().then(() => __importStar(require('../services/webAuthAutomator')));
+                const captured = await autoCaptureGeminiWebSession(180000, raw.email);
+                this.manager.upgradeOauthToWebSession(profileName, captured.cookies, captured.email);
+                this.unbanAccount(profileName);
+                console.log(`[Auto-Recovery] ✓ Đã tự động phục hồi và chuyển [${profileName}] sang Web Mode thành công!`);
+            }
+            catch (err) {
+                console.warn(`[Auto-Recovery] ✗ Tự động chuyển Web Mode cho [${profileName}] chưa hoàn tất: ${err.message}`);
+            }
+            finally {
+                this.upgradingProfiles.delete(profileName);
+            }
+        })();
+    }
+    async autoRecoverBlockedAccounts() {
+        const profiles = this.manager.listProfiles();
+        const triggered = [];
+        for (const p of profiles) {
+            if (p.isBlockedAntigravity && p.type === 'oauth' && !this.upgradingProfiles.has(p.name)) {
+                triggered.push(p.name);
+                this.triggerAutoUpgradeToWeb(p.name);
+                break; // Tự động phục hồi từng tài khoản một để không mở nhiều trình duyệt cùng lúc
+            }
+        }
+        return { triggered };
     }
     getRotationConfig() {
         return this.sqlite.getRotationConfig();
@@ -72,6 +145,7 @@ class AccountRotator {
             else if (isCooldown)
                 linkStatus = 'cooldown';
             const accountTokens = usage.tokensByAccount[p.name] || (p.email ? usage.tokensByAccount[p.email] : 0) || 0;
+            const isUpgradingWeb = this.upgradingProfiles.has(p.name);
             return {
                 portNumber: idx + 1,
                 profile: p.name,
@@ -81,6 +155,7 @@ class AccountRotator {
                 isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3500 && p.name === this.currentlyServingAccount),
                 isDisabled,
                 isBlockedAntigravity: p.isBlockedAntigravity || false,
+                isUpgradingWeb,
                 linkStatus,
                 cooldownRemainingSeconds,
                 totalRequests: s?.totalRequests || 0,
@@ -307,6 +382,9 @@ class AccountRotator {
                 if (isBannedIssue) {
                     this.markBanned(creds.profile);
                     this.manager.setBlockedAntigravity(creds.profile, true);
+                    if (creds.type === 'oauth') {
+                        this.triggerAutoUpgradeToWeb(creds.profile);
+                    }
                 }
                 else {
                     const cooldownTime = err.status === 429 ? 60 : 20;

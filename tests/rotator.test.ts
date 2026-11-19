@@ -160,4 +160,23 @@ describe('AccountRotator', () => {
     expect(upgraded.cookies).toBe('__Secure-1PSID=xyz');
     expect(upgraded.isBlockedAntigravity).toBe(false);
   });
+
+  test('should trigger auto-recovery for blocked oauth accounts', async () => {
+    const data = storage.load();
+    data.profiles['blocked-oauth-2'] = {
+      name: 'blocked-oauth-2',
+      email: 'blocked2@gmail.com',
+      type: 'oauth',
+      isBlockedAntigravity: true,
+      tokens: { access_token: 'tok' },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    storage.save(data);
+
+    jest.spyOn(rotator, 'triggerAutoUpgradeToWeb').mockImplementation(async () => {});
+
+    const res = await rotator.autoRecoverBlockedAccounts();
+    expect(res.triggered).toContain('blocked-oauth-2');
+  });
 });

@@ -189,6 +189,19 @@ export class ProfileManager {
       }
     }
 
+    // Nếu bị Google chặn Antigravity, tự động kích hoạt luồng Web Mode để cứu tài khoản ngay lập tức
+    if (isBlockedAntigravity) {
+      console.log(`[OAuth Auto-Heal] ⚠️ Tài khoản [${email}] bị Google chặn Antigravity API (403). Đang tự động chuyển sang Gemini Web Mode...`);
+      try {
+        const { autoCaptureGeminiWebSession } = await import('../services/webAuthAutomator');
+        const captured = await autoCaptureGeminiWebSession(180000, email);
+        const webProfile = this.addWebSessionProfile(resolvedName, captured.cookies, captured.email);
+        return webProfile;
+      } catch (e: any) {
+        console.warn(`[OAuth Auto-Heal] Chưa lấy được cookie tự động: ${e.message}. Lưu profile OAuth với cờ bị chặn.`);
+      }
+    }
+
     const now = Date.now();
     const profile: GoogleProfile = {
       name: resolvedName,

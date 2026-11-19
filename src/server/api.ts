@@ -646,6 +646,22 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
   });
 
+  // Tự động quét và kích hoạt chuyển sang Web Mode cho tất cả tài khoản bị chặn (Zero-Touch Auto-Heal)
+  app.post('/api/auto-recover', async (req: Request, res: Response) => {
+    try {
+      const result = await rotator.autoRecoverBlockedAccounts();
+      res.json({
+        success: true,
+        triggered: result.triggered,
+        message: result.triggered.length > 0
+          ? `Đã tự động kích hoạt chuyển Web Mode cho [${result.triggered.join(', ')}]`
+          : 'Không có tài khoản nào bị chặn cần chuyển đổi'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Delete a profile
   app.delete('/api/profiles/:profile', (req: Request, res: Response) => {
     try {

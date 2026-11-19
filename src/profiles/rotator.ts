@@ -31,6 +31,7 @@ export interface SwitchPortInfo {
   isServingNow: boolean;
   isDisabled: boolean;
   isBlockedAntigravity?: boolean;
+  isUpgradingWeb?: boolean;
   linkStatus: 'up' | 'cooldown' | 'banned' | 'down';
   cooldownRemainingSeconds: number;
   totalRequests: number;
@@ -47,6 +48,7 @@ export class AccountRotator {
   private currentIndex = 0;
   private stats: Map<string, AccountStats> = new Map();
   private disabledProfiles: Set<string> = new Set();
+  private upgradingProfiles: Set<string> = new Set();
   private currentlyServingAccount: string | null = null;
   private lastServedAt: number = 0;
 
@@ -58,6 +60,47 @@ export class AccountRotator {
   constructor(manager: ProfileManager) {
     this.manager = manager;
     this.sqlite = manager.getStorage().getSqlite();
+  }
+
+  public async triggerAutoUpgradeToWeb(profileName: string): Promise<void> {
+    if (this.upgradingProfiles.has(profileName)) {
+      return;
+    }
+    const raw = this.manager.getRawProfile(profileName);
+    if (!raw || raw.type === 'web_session') {
+      return;
+    }
+
+    this.upgradingProfiles.add(profileName);
+    console.log(`[Auto-Recovery] 🚀 Phát hiện tài khoản [${profileName}] bị chặn Antigravity. Đang tự động kích hoạt chuyển sang Gemini Web Mode...`);
+
+    // Chạy ngầm không chặn luồng chính
+    (async () => {
+      try {
+        const { autoCaptureGeminiWebSession } = await import('../services/webAuthAutomator');
+        const captured = await autoCaptureGeminiWebSession(180000, raw.email);
+        this.manager.upgradeOauthToWebSession(profileName, captured.cookies, captured.email);
+        this.unbanAccount(profileName);
+        console.log(`[Auto-Recovery] ✓ Đã tự động phục hồi và chuyển [${profileName}] sang Web Mode thành công!`);
+      } catch (err: any) {
+        console.warn(`[Auto-Recovery] ✗ Tự động chuyển Web Mode cho [${profileName}] chưa hoàn tất: ${err.message}`);
+      } finally {
+        this.upgradingProfiles.delete(profileName);
+      }
+    })();
+  }
+
+  public async autoRecoverBlockedAccounts(): Promise<{ triggered: string[] }> {
+    const profiles = this.manager.listProfiles();
+    const triggered: string[] = [];
+    for (const p of profiles) {
+      if (p.isBlockedAntigravity && p.type === 'oauth' && !this.upgradingProfiles.has(p.name)) {
+        triggered.push(p.name);
+        this.triggerAutoUpgradeToWeb(p.name);
+        break; // Tự động phục hồi từng tài khoản một để không mở nhiều trình duyệt cùng lúc
+      }
+    }
+    return { triggered };
   }
 
   public getRotationConfig(): RotationConfig {
@@ -119,6 +162,7 @@ export class AccountRotator {
 
       const accountTokens = usage.tokensByAccount[p.name] || (p.email ? usage.tokensByAccount[p.email] : 0) || 0;
 
+      const isUpgradingWeb = this.upgradingProfiles.has(p.name);
       return {
         portNumber: idx + 1,
         profile: p.name,
@@ -128,6 +172,7 @@ export class AccountRotator {
         isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3500 && p.name === this.currentlyServingAccount),
         isDisabled,
         isBlockedAntigravity: p.isBlockedAntigravity || false,
+        isUpgradingWeb,
         linkStatus,
         cooldownRemainingSeconds,
         totalRequests: s?.totalRequests || 0,
@@ -385,6 +430,9 @@ export class AccountRotator {
         if (isBannedIssue) {
           this.markBanned(creds.profile);
           this.manager.setBlockedAntigravity(creds.profile, true);
+          if (creds.type === 'oauth') {
+            this.triggerAutoUpgradeToWeb(creds.profile);
+          }
         } else {
           const cooldownTime = err.status === 429 ? 60 : 20;
           this.markCooldown(creds.profile, cooldownTime);

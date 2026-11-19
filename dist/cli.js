@@ -169,6 +169,34 @@ program
         process.exit(1);
     }
 });
+// Command: auto-heal (Tự động phục hồi toàn bộ tài khoản bị chặn sang Web Mode)
+program
+    .command('auto-heal')
+    .description('Tự động quét và phục hồi tất cả tài khoản bị chặn Antigravity sang Web Mode')
+    .action(async () => {
+    try {
+        const profiles = manager.listProfiles();
+        const blocked = profiles.filter((p) => p.isBlockedAntigravity && p.type === 'oauth');
+        if (blocked.length === 0) {
+            console.log('\n✓ Tất cả tài khoản đều khỏe mạnh hoặc đã ở Web Mode! Không có tài khoản bị chặn.');
+            process.exit(0);
+        }
+        console.log(`\n🔍 Tìm thấy ${blocked.length} tài khoản bị chặn Antigravity.`);
+        const { autoCaptureGeminiWebSession } = await Promise.resolve().then(() => __importStar(require('./services/webAuthAutomator')));
+        for (const p of blocked) {
+            console.log(`\n🚀 Đang tự động chuyển đổi [${p.name}] (${p.email}) sang Gemini Web Mode...`);
+            const captured = await autoCaptureGeminiWebSession(180000, p.email);
+            manager.upgradeOauthToWebSession(p.name, captured.cookies, captured.email);
+            console.log(`✓ Đã phục hồi [${p.name}] sang Web Mode thành công!`);
+        }
+        console.log('\n🎉 Toàn bộ tài khoản đã được phục hồi hoàn tất!');
+        process.exit(0);
+    }
+    catch (err) {
+        console.error(`\n✗ Lỗi: ${err.message}`);
+        process.exit(1);
+    }
+});
 // Command: list
 program
     .command('list')
