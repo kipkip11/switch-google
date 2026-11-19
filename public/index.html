@@ -1298,7 +1298,8 @@
         <div class="brand-title">
           Google <span>AI Switch</span>
           <span class="brand-badge">GS-400 PRO</span>
-          <span class="brand-badge" id="app-version-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">v1.1.0</span>
+          <span class="brand-badge" id="app-version-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">v1.3.0</span>
+          <span class="brand-badge" id="app-cicd-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); display: none;" title="Kiểm định chất lượng tự động GitHub Actions CI/CD">CI: Verified ✅</span>
         </div>
       </div>
     </div>
@@ -1307,6 +1308,11 @@
       <!-- 1-Click Update Button -->
       <button class="btn-action" id="btn-system-update" style="display:none; padding: 6px 12px; font-size: 0.78rem; align-items: center; gap: 5px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: 1px solid #34d399;" onclick="triggerSystemUpdate()" title="Phát hiện bản cập nhật mới trên GitHub. Bấm để tự động cập nhật">
         <span>🚀</span> <span id="update-btn-text">Cập Nhật Mới</span>
+      </button>
+
+      <!-- Auto-Update Toggle -->
+      <button class="btn-action" id="btn-toggle-autoupdate" style="padding: 6px 10px; font-size: 0.76rem; display: flex; align-items: center; gap: 4px;" onclick="toggleAutoUpdate()" title="Tự động cập nhật ngầm khi có bản mới vượt qua bộ lọc CI/CD">
+        <span id="autoupdate-icon">🔄</span> <span id="autoupdate-label">Tự Cập Nhật</span>
       </button>
 
       <!-- Auto-Start Boot Toggle -->
@@ -3286,14 +3292,59 @@
           if (vBadge) vBadge.innerText = 'v' + data.currentVersion;
         }
 
+        // CI/CD Badge
+        const cicdBadge = document.getElementById('app-cicd-badge');
+        if (cicdBadge) {
+          if (data.ciPassed) {
+            cicdBadge.style.display = 'inline-block';
+            cicdBadge.innerText = 'CI: Verified ✅';
+            cicdBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            cicdBadge.style.color = '#10b981';
+            cicdBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            cicdBadge.title = data.ciDetails || 'Đã vượt qua toàn bộ bộ lọc CI/CD';
+          } else if (data.ciStatus === 'in_progress') {
+            cicdBadge.style.display = 'inline-block';
+            cicdBadge.innerText = 'CI: Testing ⏳';
+            cicdBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+            cicdBadge.style.color = '#f59e0b';
+            cicdBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            cicdBadge.title = data.ciDetails || 'CI/CD pipeline đang kiểm thử';
+          } else {
+            cicdBadge.style.display = 'none';
+          }
+        }
+
         const updateBtn = document.getElementById('btn-system-update');
         if (updateBtn) {
           if (data.hasUpdate) {
             updateBtn.style.display = 'inline-flex';
             const btnText = document.getElementById('update-btn-text');
-            if (btnText) btnText.innerText = `Bản Mới (${data.latestCommit})`;
+            if (btnText) {
+              if (data.ciPassed) {
+                btnText.innerText = `Cập Nhật (${data.latestCommit} - CI Passed ✅)`;
+                updateBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                updateBtn.style.borderColor = '#34d399';
+              } else {
+                btnText.innerText = `Bản Mới (${data.latestCommit} - Chờ CI ⏳)`;
+                updateBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                updateBtn.style.borderColor = '#fbbf24';
+              }
+            }
           } else {
             updateBtn.style.display = 'none';
+          }
+        }
+
+        // Auto-Update toggle state
+        const autoupdateIcon = document.getElementById('autoupdate-icon');
+        const autoupdateLabel = document.getElementById('autoupdate-label');
+        if (data.autoUpdate && autoupdateLabel) {
+          if (data.autoUpdate.enabled) {
+            autoupdateIcon.innerText = '✅';
+            autoupdateLabel.innerText = 'Tự Update: BẬT';
+          } else {
+            autoupdateIcon.innerText = '⚪';
+            autoupdateLabel.innerText = 'Tự Update: TẮT';
           }
         }
 
@@ -3309,6 +3360,26 @@
           }
         }
       } catch (_) {}
+    }
+
+    async function toggleAutoUpdate() {
+      const isEnabled = currentSystemInfo?.autoUpdate?.enabled ?? true;
+      const willEnable = !isEnabled;
+      toast(`Đang ${willEnable ? 'bật' : 'tắt'} tự động cập nhật ngầm qua CI/CD...`);
+      try {
+        const res = await fetch('/api/system/update/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: willEnable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast(`✓ Đã ${willEnable ? 'BẬT' : 'TẮT'} tự động cập nhật ngầm!`);
+          checkSystemVersion();
+        }
+      } catch (err) {
+        alert('Lỗi: ' + err.message);
+      }
     }
 
     async function triggerSystemUpdate() {

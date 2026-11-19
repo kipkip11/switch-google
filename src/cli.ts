@@ -296,7 +296,7 @@ program
 // Command: daemon
 program
   .command('daemon <action>')
-  .description('Quản lý tiến trình chạy ngầm & tự khởi động cùng máy tính: start | stop | status | enable | disable')
+  .description('Quản lý tiến trình chạy ngầm & tự khởi động cùng máy tính: start | stop | restart | status | enable | disable')
   .option('-p, --port <number>', 'Cổng Web Server', '1909')
   .action(async (action: string, options: { port: string }) => {
     const port = parseInt(options.port, 10) || 1909;
@@ -319,8 +319,14 @@ program
         console.log(`\n${res.success ? '✓' : '✗'} ${res.message}`);
         break;
       }
+      case 'restart': {
+        const res = daemon.restartDaemon(port);
+        console.log(`\n${res.success ? '✓' : '✗'} ${res.message}`);
+        break;
+      }
       case 'status': {
         const status = daemon.getStatus(port);
+        const autoUpdate = daemon.getAutoUpdateConfig();
         console.log(`\n======================================================`);
         console.log(`  TRẠNG THÁI TIẾN TRÌNH NGẦM (DAEMON STATUS)`);
         console.log(`======================================================`);
@@ -330,6 +336,7 @@ program
           console.log(`  URL Web Dashboard:     http://localhost:${status.port}`);
         }
         console.log(`  Tự bật khi mở máy:     ${status.autoStartEnabled ? '✅ ĐÃ BẬT' : '❌ CHƯA BẬT'}`);
+        console.log(`  Tự cập nhật ngầm:      ${autoUpdate.enabled ? '✅ ĐÃ BẬT (Mỗi ' + autoUpdate.intervalMinutes + ' phút)' : '❌ ĐÃ TẮT'}`);
         console.log(`  File nhật ký (Log):    ${status.logFile}`);
         console.log(`======================================================\n`);
         break;
@@ -348,9 +355,39 @@ program
         console.log(`\nHành động không hợp lệ: "${action}". Vui lòng dùng một trong các lệnh:`);
         console.log(`  switch-google daemon start   # Khởi chạy ngầm và mở Web`);
         console.log(`  switch-google daemon stop    # Dừng tiến trình ngầm`);
+        console.log(`  switch-google daemon restart # Khởi động lại tiến trình ngầm`);
         console.log(`  switch-google daemon status  # Xem trạng thái daemon`);
         console.log(`  switch-google daemon enable  # Bật tự khởi động cùng máy tính`);
         console.log(`  switch-google daemon disable # Tắt tự khởi động cùng máy tính\n`);
+    }
+  });
+
+// Command: autoupdate
+program
+  .command('autoupdate [action]')
+  .description('Bật, tắt hoặc xem trạng thái tự động cập nhật ngầm qua bộ lọc CI/CD (on | off | status)')
+  .action((action?: string) => {
+    const act = (action || 'status').toLowerCase();
+    if (act === 'on') {
+      daemon.saveAutoUpdateConfig({ enabled: true });
+      console.log(`\n✓ Đã BẬT tự động cập nhật ngầm khi có bản mới vượt qua bộ lọc CI/CD!`);
+    } else if (act === 'off') {
+      daemon.saveAutoUpdateConfig({ enabled: false });
+      console.log(`\n✓ Đã TẮT tự động cập nhật ngầm.`);
+    } else {
+      const cfg = daemon.getAutoUpdateConfig();
+      console.log(`\n======================================================`);
+      console.log(`  CẤU HÌNH TỰ ĐỘNG CẬP NHẬT NGẦM (AUTO-UPDATE)`);
+      console.log(`======================================================`);
+      console.log(`  Trạng thái:            ${cfg.enabled ? '✅ ĐANG BẬT' : '❌ ĐANG TẮT'}`);
+      console.log(`  Chu kỳ kiểm tra:       Mỗi ${cfg.intervalMinutes} phút`);
+      if (cfg.lastCheckTime) {
+        console.log(`  Lần kiểm tra gần nhất: ${new Date(cfg.lastCheckTime).toLocaleString()}`);
+      }
+      if (cfg.lastCheckedStatus) {
+        console.log(`  Kết quả kiểm tra:      ${cfg.lastCheckedStatus}`);
+      }
+      console.log(`======================================================\n`);
     }
   });
 
@@ -358,7 +395,7 @@ program
 program
   .command('update')
   .alias('upgrade')
-  .description('Kiểm tra và tự động cập nhật Switch Google lên bản mới nhất từ GitHub')
+  .description('Kiểm tra và cập nhật Switch Google lên bản mới nhất đã thông qua bộ lọc CI/CD từ GitHub')
   .action(async () => {
     console.log(`\nĐang kiểm tra phiên bản mới nhất từ GitHub...`);
     const check = await daemon.checkGithubUpdates();
@@ -367,17 +404,25 @@ program
     if (check.latestMessage) {
       console.log(`Nội dung mới: "${check.latestMessage}"`);
     }
+    console.log(`Bộ lọc CI/CD: ${check.ciDetails}`);
 
     if (!check.hasUpdate) {
       console.log(`\n✓ Bạn đang sử dụng phiên bản mới nhất!`);
       return;
     }
 
-    console.log(`\n⏳ Phát hiện bản cập nhật mới! Đang tiến hành tải và build tự động...`);
+    if (!check.ciPassed) {
+      console.log(`\n⚠ Cảnh báo: Bản cập nhật này chưa vượt qua toàn bộ bộ lọc CI/CD (${check.ciDetails}).`);
+      console.log(`Hệ thống khuyến nghị đợi pipeline kiểm thử hoàn tất trên GitHub để đảm bảo an toàn tuyệt đối.`);
+    } else {
+      console.log(`\n✓ Bản cập nhật đã vượt qua 100% bộ lọc CI/CD Quality Gate.`);
+    }
+
+    console.log(`\n⏳ Đang tiến hành tải và build tự động...`);
     const updateResult = daemon.performSelfUpdate();
     if (updateResult.success) {
       console.log(`\n✓ ${updateResult.message}`);
-      console.log(`Nếu bạn đang chạy daemon ngầm, hãy gõ "switch-google daemon stop && switch-google daemon start" để áp dụng.`);
+      console.log(`Nếu bạn đang chạy daemon ngầm, hãy gõ "switch-google daemon restart" để áp dụng.`);
     } else {
       console.error(`\n✗ ${updateResult.message}`);
     }

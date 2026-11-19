@@ -766,10 +766,44 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
         try {
             const updateInfo = await daemon.checkGithubUpdates();
             const daemonStatus = daemon.getStatus(port);
+            const autoUpdate = daemon.getAutoUpdateConfig();
             res.json({
                 ...updateInfo,
-                daemon: daemonStatus
+                daemon: daemonStatus,
+                autoUpdate
             });
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Get and set auto-update configuration
+    app.get('/api/system/update/config', (req, res) => {
+        try {
+            res.json(daemon.getAutoUpdateConfig());
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    app.post('/api/system/update/config', (req, res) => {
+        try {
+            const { enabled, intervalMinutes } = req.body;
+            const updated = daemon.saveAutoUpdateConfig({
+                enabled: typeof enabled === 'boolean' ? enabled : undefined,
+                intervalMinutes: typeof intervalMinutes === 'number' ? intervalMinutes : undefined
+            });
+            res.json({ success: true, config: updated });
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Check update now
+    app.post('/api/system/update/check-now', async (req, res) => {
+        try {
+            const updateInfo = await daemon.checkGithubUpdates();
+            res.json(updateInfo);
         }
         catch (err) {
             res.status(500).json({ error: err.message });
@@ -780,6 +814,25 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
         try {
             const result = daemon.performSelfUpdate();
             res.json(result);
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Restart server daemon
+    app.post('/api/system/restart', (req, res) => {
+        try {
+            res.json({ success: true, message: 'Server đang khởi động lại...' });
+            setTimeout(() => {
+                if (serverInstance) {
+                    serverInstance.close(() => {
+                        daemon.performSelfRestart(port);
+                    });
+                }
+                else {
+                    daemon.performSelfRestart(port);
+                }
+            }, 300);
         }
         catch (err) {
             res.status(500).json({ error: err.message });
@@ -800,7 +853,8 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             res.status(500).json({ error: err.message });
         }
     });
-    app.listen(port, '0.0.0.0', () => {
+    let serverInstance = null;
+    serverInstance = app.listen(port, '0.0.0.0', () => {
         console.log(`\n======================================================`);
         console.log(`  🚀 switch-google Web Dashboard & API Server:`);
         console.log(`  🌐 Dashboard: http://localhost:${port} hoặc http://0.0.0.0:${port}`);
@@ -809,16 +863,20 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
         console.log(`- Web UI: Mở http://localhost:${port} trên trình duyệt`);
         console.log(`- OpenAI Proxy: Cấu hình Base URL http://localhost:${port}/v1 cho Hermes Agent/Cursor/Cline`);
         console.log(`- Hỗ trợ kết nối từ máy khác trong mạng LAN qua port ${port}`);
-        console.log(`- GET  /api/status        : Kiểm tra trạng thái server`);
-        console.log(`- GET  /api/profiles      : Danh sách các tài khoản`);
-        console.log(`- POST /api/login         : Đăng nhập thêm tài khoản OAuth`);
-        console.log(`- POST /api/profiles/apikey : Thêm tài khoản bằng Gemini API Key`);
-        console.log(`- POST /api/profiles/token  : Thêm tài khoản bằng Token trực tiếp`);
-        console.log(`- GET  /api/token         : Lấy Access Token của tài khoản Active`);
-        console.log(`- GET  /api/token/:name   : Lấy Access Token của tài khoản chỉ định`);
-        console.log(`- POST /api/switch        : Đổi tài khoản active { "profile": "..." }`);
-        console.log(`- DELETE /api/profiles/:n : Xóa profile`);
-        console.log(`- POST /api/proxy         : Proxy gửi request Google API tự đính kèm Token`);
+        console.log(`- Tự động cập nhật ngầm qua CI/CD: Đang hoạt động`);
         console.log(`======================================================\n`);
     });
+    // Khởi động tiến trình tự động kiểm tra và nâng cấp ngầm thông qua bộ lọc CI/CD
+    daemon.startAutoUpdateWorker(port, () => {
+        console.log('[AutoUpdate] Đang bàn giao cổng mạng và khởi động lại Web Server...');
+        if (serverInstance) {
+            serverInstance.close(() => {
+                daemon.performSelfRestart(port);
+            });
+        }
+        else {
+            daemon.performSelfRestart(port);
+        }
+    });
+    return serverInstance;
 }

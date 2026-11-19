@@ -43,3 +43,16 @@ jobs:
 
       - name: Security Vulnerability Scan
         run: npm audit --audit-level=critical || true
+
+  ci-quality-gate:
+    name: CI/CD Quality Gate (Auto-Update Verification)
+    needs: quality-and-tests
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Verify Quality Gate Passed
+        run: |
+          echo "=========================================================="
+          echo "✓ CI/CD Quality Gate Passed: All unit tests and builds OK!"
+          echo "✓ Safe for automatic client self-update."
+          echo "=========================================================="

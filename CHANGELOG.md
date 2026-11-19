@@ -5,6 +5,21 @@ Tất cả các thay đổi đáng chú ý của dự án **Switch-Google** sẽ
 
 ---
 
+## [1.3.1] - 2026-11-19
+
+### 🚀 Tính Năng Mới (Features)
+- **Tự Động Cập Nhật Ngầm Qua Bộ Lọc CI/CD (Zero-Touch Client Auto-Update)**:
+  - Tích hợp `AutoUpdateWorker` chạy nền trong daemon trên các máy client, định kỳ kiểm tra phiên bản mới từ GitHub.
+  - **Bộ lọc kiểm định CI/CD (Quality Gate Verification)**: Gọi GitHub Checks API xác thực trạng thái các bài kiểm thử (`Build, Lint & Unit Tests` trên ma trận Node.js 20, 22, 24).
+  - Chỉ tự động tải và cập nhật khi toàn bộ pipeline CI/CD đạt trạng thái `status: completed` và `conclusion: success` 100%. Nếu bản cập nhật đang test dở hoặc bị lỗi, hệ thống sẽ bỏ qua để bảo vệ máy trạm.
+  - **Graceful Self-Restart**: Tự động sao lưu database an toàn trước khi nâng cấp, tải code, build và khởi động lại server ngầm êm ái mà không gây xung đột socket/port.
+  - **Quản lý linh hoạt trên Web Dashboard & CLI**:
+    - Nút công tắc Bật/Tắt `Tự Động Cập Nhật (Auto-Update)` trực tiếp trên thanh Header của Dashboard.
+    - Huy hiệu `CI: Verified ✅` hiển thị trực quan trạng thái kiểm định của bản cập nhật.
+    - Lệnh CLI: `switch-google autoupdate [on|off|status]` và `switch-google daemon restart`.
+
+---
+
 ## [1.3.0] - 2026-11-19
 
 ### 🚀 Tính Năng Mới (Features)
