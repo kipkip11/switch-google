@@ -28,6 +28,111 @@ function resolveUpstreamModel(model) {
     }
     return model;
 }
+function resolveGenerativeLanguageModel(model) {
+    const m = model.toLowerCase();
+    if (m.includes('flash'))
+        return 'gemini-1.5-flash';
+    if (m.includes('pro') || m.includes('sonnet') || m.includes('argon') || m.includes('opus'))
+        return 'gemini-1.5-pro';
+    if (m.startsWith('gemini-'))
+        return model;
+    return 'gemini-1.5-flash';
+}
+async function callUpstreamGoogle(creds, actualModel, geminiBody, stream) {
+    const isApiKey = creds.type === 'api_key' && creds.apiKey;
+    const isAntigravityToken = creds.type === 'token';
+    if (isApiKey) {
+        const glModel = resolveGenerativeLanguageModel(actualModel);
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse&key=' : 'generateContent?key='}${creds.apiKey}`;
+        const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(geminiBody)
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            const err = new Error(errText);
+            err.status = res.status;
+            throw err;
+        }
+        return res;
+    }
+    if (isAntigravityToken) {
+        const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+            'Authorization': `Bearer ${creds.access_token}`
+        };
+        const requestPayload = {
+            project: 'aicode-consumers',
+            model: actualModel,
+            userAgent: 'antigravity',
+            request: geminiBody
+        };
+        const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestPayload)
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            const err = new Error(errText);
+            err.status = res.status;
+            throw err;
+        }
+        return res;
+    }
+    // OAuth Account: thử daily-cloudcode-pa trước, nếu 403 / 401 thì fallback sang generativelanguage
+    try {
+        const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+            'Authorization': `Bearer ${creds.access_token}`
+        };
+        const requestPayload = {
+            project: 'aicode-consumers',
+            model: actualModel,
+            userAgent: 'antigravity',
+            request: geminiBody
+        };
+        const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestPayload)
+        });
+        if (res.ok)
+            return res;
+        if (res.status !== 403 && res.status !== 401) {
+            const errText = await res.text();
+            const err = new Error(errText);
+            err.status = res.status;
+            throw err;
+        }
+    }
+    catch (err) {
+        // tiếp tục fallback
+    }
+    // Fallback to generativelanguage with OAuth Bearer token
+    const glModel = resolveGenerativeLanguageModel(actualModel);
+    const glUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+    const glRes = await fetch(glUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${creds.access_token}`
+        },
+        body: JSON.stringify(geminiBody)
+    });
+    if (!glRes.ok) {
+        const errText = await glRes.text();
+        const err = new Error(errText);
+        err.status = glRes.status;
+        throw err;
+    }
+    return glRes;
+}
 /**
  * Chuyển đổi OpenAI Tools spec sang Google Gemini functionDeclarations
  */
@@ -326,41 +431,7 @@ function createOpenAiRouter(manager, rotator) {
                     if (stream) {
                         // Streaming SSE response
                         const { result } = await rotator.executeWithFailover(async (creds) => {
-                            let apiUrl = '';
-                            const headers = {
-                                'Content-Type': 'application/json',
-                                'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64'
-                            };
-                            let requestPayload = geminiBody;
-                            if (creds.type === 'api_key' && creds.apiKey) {
-                                apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:streamGenerateContent?alt=sse&key=${creds.apiKey}`;
-                            }
-                            else {
-                                apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse`;
-                                headers['Authorization'] = `Bearer ${creds.access_token}`;
-                                requestPayload = {
-                                    project: 'aicode-consumers',
-                                    model: actualModel,
-                                    userAgent: 'antigravity',
-                                    request: geminiBody
-                                };
-                            }
-                            try {
-                                const fs = require('fs');
-                                fs.writeFileSync('/tmp/hermes_payload.json', JSON.stringify(requestPayload, null, 2));
-                            }
-                            catch (_) { }
-                            let res = await fetch(apiUrl, {
-                                method: 'POST',
-                                headers,
-                                body: JSON.stringify(requestPayload)
-                            });
-                            if (!res.ok) {
-                                const errText = await res.text();
-                                const err = new Error(errText);
-                                err.status = res.status;
-                                throw err;
-                            }
+                            const res = await callUpstreamGoogle(creds, actualModel, geminiBody, true);
                             return { geminiRes: res, account: creds.profile };
                         });
                         const { geminiRes, account } = result;
@@ -516,6 +587,7 @@ function createOpenAiRouter(manager, rotator) {
                         res.write('data: [DONE]\n\n');
                         res.end();
                         // Record token usage
+                        const streamTotalTokens = streamPromptTokens + streamCompletionTokens;
                         tracker_1.usageTracker.record({
                             profile: account,
                             email: account,
@@ -523,45 +595,17 @@ function createOpenAiRouter(manager, rotator) {
                             virtualKey: (req.headers['authorization'] || '').replace('Bearer ', '').slice(0, 16),
                             promptTokens: streamPromptTokens,
                             completionTokens: streamCompletionTokens,
-                            totalTokens: streamPromptTokens + streamCompletionTokens,
+                            totalTokens: streamTotalTokens,
                             latencyMs: Date.now() - requestStartTime,
                             statusCode: 200,
                             stream: true
                         });
+                        rotator.recordSuccess(account, streamTotalTokens);
                         return;
                     }
                     // Non-streaming response with failover
                     const { result: data, accountUsed } = await rotator.executeWithFailover(async (creds) => {
-                        let apiUrl = '';
-                        const headers = {
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64'
-                        };
-                        let requestPayload = geminiBody;
-                        if (creds.type === 'api_key' && creds.apiKey) {
-                            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:generateContent?key=${creds.apiKey}`;
-                        }
-                        else {
-                            apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent`;
-                            headers['Authorization'] = `Bearer ${creds.access_token}`;
-                            requestPayload = {
-                                project: 'aicode-consumers',
-                                model: actualModel,
-                                userAgent: 'antigravity',
-                                request: geminiBody
-                            };
-                        }
-                        let res = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers,
-                            body: JSON.stringify(requestPayload)
-                        });
-                        if (!res.ok) {
-                            const errText = await res.text();
-                            const err = new Error(errText);
-                            err.status = res.status;
-                            throw err;
-                        }
+                        const res = await callUpstreamGoogle(creds, actualModel, geminiBody, false);
                         return await res.json();
                     });
                     const candidate = (data.candidates || data.response?.candidates || [])[0] || {};
@@ -623,6 +667,7 @@ function createOpenAiRouter(manager, rotator) {
                         }
                     });
                     // Record token usage
+                    const nonStreamTotal = promptTokens + completionTokens;
                     tracker_1.usageTracker.record({
                         profile: accountUsed,
                         email: accountUsed,
@@ -630,11 +675,12 @@ function createOpenAiRouter(manager, rotator) {
                         virtualKey: (req.headers['authorization'] || '').replace('Bearer ', '').slice(0, 16),
                         promptTokens,
                         completionTokens,
-                        totalTokens: promptTokens + completionTokens,
+                        totalTokens: nonStreamTotal,
                         latencyMs: Date.now() - requestStartTime,
                         statusCode: 200,
                         stream: false
                     });
+                    rotator.recordSuccess(accountUsed, nonStreamTotal);
                     return;
                 }
                 catch (err) {

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import { SqliteStorage } from '../storage/sqliteStorage';
 
 export interface TokenData {
   access_token?: string | null;
@@ -48,20 +49,20 @@ export interface StorageData {
 
 export class ProfileStorage {
   private baseDir: string;
+  private sqlite: SqliteStorage;
   private storageFile: string;
   private keyFile: string;
   private encryptionKey: Buffer;
 
   constructor(customBaseDir?: string) {
     this.baseDir = customBaseDir || path.join(os.homedir(), '.switch-google');
-    this.storageFile = path.join(this.baseDir, 'profiles.enc.json');
-    this.keyFile = path.join(this.baseDir, 'master.key');
-
     if (!fs.existsSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, { recursive: true, mode: 0o700 });
     }
-
+    this.storageFile = path.join(this.baseDir, 'profiles.enc.json');
+    this.keyFile = path.join(this.baseDir, 'master.key');
     this.encryptionKey = this.getOrCreateKey();
+    this.sqlite = SqliteStorage.getInstance(this.baseDir);
   }
 
   private getOrCreateKey(): Buffer {
@@ -98,108 +99,139 @@ export class ProfileStorage {
     return decrypted;
   }
 
+  public getSqlite(): SqliteStorage {
+    return this.sqlite;
+  }
+
+  public close(): void {
+    this.sqlite.close();
+  }
+
   public load(): StorageData {
-    if (!fs.existsSync(this.storageFile)) {
-      return { activeProfile: null, profiles: {}, apiKeys: [], combos: [] };
+    const profilesList = this.sqlite.getAllProfiles();
+    const profiles: Record<string, GoogleProfile> = {};
+    for (const p of profilesList) {
+      profiles[p.name] = p;
     }
 
-    try {
-      const encryptedData = fs.readFileSync(this.storageFile, 'utf8');
-      const decryptedJson = this.decrypt(encryptedData);
-      const data = JSON.parse(decryptedJson) as StorageData;
-      data.apiKeys = data.apiKeys || [];
-      data.combos = data.combos || [];
-      return data;
-    } catch (err) {
-      console.error('Lỗi giải mã file lưu trữ token, khởi tạo dữ liệu mặc định:', err);
-      return { activeProfile: null, profiles: {}, apiKeys: [], combos: [] };
-    }
+    const activeProfile = this.sqlite.getActiveProfile();
+    const apiKeys = this.sqlite.getApiKeys();
+    const combos = this.sqlite.getCombos();
+
+    return {
+      activeProfile,
+      profiles,
+      apiKeys,
+      combos
+    };
   }
 
   public save(data: StorageData): void {
     data.apiKeys = data.apiKeys || [];
     data.combos = data.combos || [];
-    const jsonStr = JSON.stringify(data, null, 2);
-    const encryptedData = this.encrypt(jsonStr);
-    fs.writeFileSync(this.storageFile, encryptedData, { mode: 0o600 });
+
+    // 1. Lưu vào SQLite
+    if (data.activeProfile) {
+      this.sqlite.setActiveProfile(data.activeProfile);
+    }
+    if (data.profiles) {
+      const currentSqliteProfiles = this.sqlite.getAllProfiles();
+      const newNames = new Set(Object.keys(data.profiles));
+      for (const oldP of currentSqliteProfiles) {
+        if (!newNames.has(oldP.name)) {
+          this.sqlite.deleteProfile(oldP.name);
+        }
+      }
+      for (const p of Object.values(data.profiles)) {
+        this.sqlite.saveProfile(p);
+      }
+    }
+    if (data.apiKeys) {
+      const currentKeys = this.sqlite.getApiKeys();
+      const newKeyIds = new Set(data.apiKeys.map(k => k.id));
+      for (const oldK of currentKeys) {
+        if (!newKeyIds.has(oldK.id)) {
+          this.sqlite.deleteApiKey(oldK.id);
+        }
+      }
+      for (const k of data.apiKeys) {
+        this.sqlite.saveApiKey(k);
+      }
+    }
+    if (data.combos) {
+      const currentCombos = this.sqlite.getCombos();
+      const newComboIds = new Set(data.combos.map(c => c.id));
+      for (const oldC of currentCombos) {
+        if (!newComboIds.has(oldC.id)) {
+          this.sqlite.deleteCombo(oldC.id);
+        }
+      }
+      for (const c of data.combos) {
+        this.sqlite.saveCombo(c);
+      }
+    }
+
+    // 2. Lưu đồng thời bản sao lưu mã hóa AES-256-GCM profiles.enc.json
+    try {
+      const jsonStr = JSON.stringify(data, null, 2);
+      const encryptedData = this.encrypt(jsonStr);
+      fs.writeFileSync(this.storageFile, encryptedData, { mode: 0o600 });
+    } catch (_) {}
   }
 
   public getApiKeys(): VirtualApiKey[] {
-    const data = this.load();
-    return data.apiKeys || [];
+    return this.sqlite.getApiKeys();
   }
 
   public createApiKey(name: string): VirtualApiKey {
-    const data = this.load();
-    data.apiKeys = data.apiKeys || [];
-    const randomHex = crypto.randomBytes(24).toString('hex');
-    const newKey: VirtualApiKey = {
-      id: 'key_' + Date.now().toString(36),
-      name: name.trim(),
-      key: `sk-switch-${randomHex}`,
-      createdAt: Date.now()
-    };
-    data.apiKeys.push(newKey);
-    this.save(data);
-    return newKey;
+    const key = this.sqlite.createApiKey(name);
+    // sync encrypted json
+    this.save(this.load());
+    return key;
   }
 
   public deleteApiKey(id: string): boolean {
-    const data = this.load();
-    data.apiKeys = data.apiKeys || [];
-    const prevLen = data.apiKeys.length;
-    data.apiKeys = data.apiKeys.filter((k) => k.id !== id && k.key !== id);
-    if (data.apiKeys.length !== prevLen) {
-      this.save(data);
-      return true;
-    }
-    return false;
+    const res = this.sqlite.deleteApiKey(id);
+    if (res) this.save(this.load());
+    return res;
   }
 
   public touchApiKey(keyString: string): void {
-    const data = this.load();
-    const item = data.apiKeys?.find((k) => k.key === keyString);
-    if (item) {
-      item.lastUsedAt = Date.now();
-      this.save(data);
-    }
+    this.sqlite.touchApiKey(keyString);
   }
 
   public getCombos(): ModelCombo[] {
-    const data = this.load();
-    return data.combos || [];
+    return this.sqlite.getCombos();
   }
 
   public createCombo(name: string, strategy: 'fallback' | 'round-robin', models: string[]): ModelCombo {
-    const data = this.load();
-    data.combos = data.combos || [];
-    const existingIndex = data.combos.findIndex((c) => c.name.toLowerCase() === name.trim().toLowerCase());
-    const combo: ModelCombo = {
-      id: 'combo_' + Date.now().toString(36),
-      name: name.trim(),
-      strategy,
-      models: models.filter((m) => m && m.trim().length > 0),
-      createdAt: Date.now()
-    };
-    if (existingIndex >= 0) {
-      data.combos[existingIndex] = combo;
-    } else {
-      data.combos.push(combo);
-    }
-    this.save(data);
+    const combo = this.sqlite.createCombo(name, strategy, models);
+    this.save(this.load());
     return combo;
   }
 
+  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin'; models?: string[] }): ModelCombo | null {
+    const res = this.sqlite.updateCombo(id, updates);
+    if (res) this.save(this.load());
+    return res;
+  }
+
+  public addModelToCombo(comboId: string, model: string): ModelCombo | null {
+    const res = this.sqlite.addModelToCombo(comboId, model);
+    if (res) this.save(this.load());
+    return res;
+  }
+
+  public removeModelFromCombo(comboId: string, model: string): ModelCombo | null {
+    const res = this.sqlite.removeModelFromCombo(comboId, model);
+    if (res) this.save(this.load());
+    return res;
+  }
+
   public deleteCombo(id: string): boolean {
-    const data = this.load();
-    data.combos = data.combos || [];
-    const prevLen = data.combos.length;
-    data.combos = data.combos.filter((c) => c.id !== id && c.name !== id);
-    if (data.combos.length !== prevLen) {
-      this.save(data);
-      return true;
-    }
-    return false;
+    const res = this.sqlite.deleteCombo(id);
+    if (res) this.save(this.load());
+    return res;
   }
 
   public getStorageDirectory(): string {
@@ -219,26 +251,42 @@ export class ProfileStorage {
   public importBackup(backupJson: string): number {
     const parsed = JSON.parse(backupJson);
     const backupData = parsed.data || parsed.storage || parsed;
-    const current = this.load();
     let importedCount = 0;
 
+    const current = this.load();
     if (backupData.profiles) {
-      for (const [name, prof] of Object.entries(backupData.profiles as Record<string, GoogleProfile>)) {
-        current.profiles[name] = prof;
+      for (const prof of Object.values(backupData.profiles as Record<string, GoogleProfile>)) {
+        this.sqlite.saveProfile(prof);
+        current.profiles[prof.name] = prof;
         importedCount++;
       }
     }
-    if (backupData.activeProfile && current.profiles[backupData.activeProfile]) {
+    if (backupData.activeProfile) {
+      this.sqlite.setActiveProfile(backupData.activeProfile);
       current.activeProfile = backupData.activeProfile;
     }
     if (Array.isArray(backupData.apiKeys)) {
+      for (const k of backupData.apiKeys) {
+        this.sqlite.saveApiKey(k);
+      }
       current.apiKeys = backupData.apiKeys;
     }
     if (Array.isArray(backupData.combos)) {
+      for (const c of backupData.combos) {
+        this.sqlite.saveCombo(c);
+      }
       current.combos = backupData.combos;
     }
 
     this.save(current);
     return importedCount;
+  }
+
+  public exportSqliteBuffer(): Buffer {
+    return this.sqlite.exportDatabaseBuffer();
+  }
+
+  public importSqliteBuffer(buffer: Buffer): void {
+    this.sqlite.importDatabaseBuffer(buffer);
   }
 }

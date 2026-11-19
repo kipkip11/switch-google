@@ -45,31 +45,56 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   app.get('/api/status', (req: Request, res: Response) => {
     const active = manager.getActiveProfileName();
     const profiles = manager.listProfiles();
-    const usageStats = usageTracker.getStats();
+    const timeframeParam = req.query.timeframe as string;
+    let timeframeMs = 24 * 60 * 60 * 1000;
+    if (timeframeParam === '60s') timeframeMs = 60 * 1000;
+    else if (timeframeParam === '1h') timeframeMs = 60 * 60 * 1000;
+    else if (timeframeParam === '6h') timeframeMs = 6 * 60 * 60 * 1000;
+
+    const usageStats = usageTracker.getStats(timeframeMs);
     const recentLogs = usageTracker.getRecentLogs(1);
     const latestModel = recentLogs[0]?.model || 'gemini-3.8-flash';
+    const liveTraffic = usageTracker.getLiveTraffic();
+    const rotationConfig = rotator.getRotationConfig();
+
     const ports = rotator.getPortStatuses().map(p => ({
       ...p,
       totalTokens: usageStats.tokensByAccount[p.profile] || (p.email ? usageStats.tokensByAccount[p.email] : 0) || 0
     }));
+
     res.json({
       status: 'online',
       activeProfile: active,
       totalProfiles: profiles.length,
-      strategy: rotator.getStrategy(),
+      strategy: rotationConfig.strategy,
+      rotationConfig,
       accountStats: rotator.getStats(),
       ports,
       serving: rotator.getCurrentlyServing(),
+      liveTraffic,
       latestModel,
+      usageStats,
       uplink: {
         totalTokens: usageStats.totalTokens || 0,
         totalPromptTokens: usageStats.totalPromptTokens || 0,
         totalCompletionTokens: usageStats.totalCompletionTokens || 0,
         totalRequests: usageStats.totalRequests || 0,
+        tokensPerSecond: usageStats.tokensPerSecond || 0,
+        avgLatencyMs: usageStats.avgLatencyMs || 0,
         clients: 'Hermes / Cursor / Cline'
       },
       timestamp: new Date().toISOString()
     });
+  });
+
+  // Realtime usage statistics with custom timeframe
+  app.get('/api/usage/realtime', (req: Request, res: Response) => {
+    const tf = (req.query.timeframe as string) || '24h';
+    let ms = 24 * 60 * 60 * 1000;
+    if (tf === '60s') ms = 60 * 1000;
+    else if (tf === '1h') ms = 60 * 60 * 1000;
+    else if (tf === '6h') ms = 6 * 60 * 60 * 1000;
+    res.json(usageTracker.getStats(ms));
   });
 
   // Ping Google API for one or all profiles
@@ -87,44 +112,68 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         const t0 = Date.now();
         try {
           const creds = await manager.getTokenForProfile(p.name);
-          let apiUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent';
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64'
-          };
-          let bodyObj: any = {
-            project: 'aicode-consumers',
-            model: 'gemini-3.8-flash-high',
-            userAgent: 'antigravity',
-            request: {
-              contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
-            }
-          };
+          let fetchRes: any = null;
 
           if (creds.type === 'api_key' && creds.apiKey) {
-            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${creds.apiKey}`;
-            bodyObj = { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] };
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${creds.apiKey}`;
+            fetchRes = await fetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
+            });
+          } else if (creds.type === 'token') {
+            const apiUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent';
+            fetchRes = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                'Authorization': `Bearer ${creds.access_token}`
+              },
+              body: JSON.stringify({
+                project: 'aicode-consumers',
+                model: 'gemini-3.8-flash-high',
+                userAgent: 'antigravity',
+                request: { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] }
+              })
+            });
           } else {
-            headers['Authorization'] = `Bearer ${creds.access_token}`;
+            // OAuth account: thử daily-cloudcode-pa, nếu 403 thử generativelanguage
+            try {
+              fetchRes = await fetch('https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                  'Authorization': `Bearer ${creds.access_token}`
+                },
+                body: JSON.stringify({
+                  project: 'aicode-consumers',
+                  model: 'gemini-3.8-flash-high',
+                  userAgent: 'antigravity',
+                  request: { contents: [{ role: 'user', parts: [{ text: 'ping' }] }] }
+                })
+              });
+            } catch (_) {}
+
+            if (!fetchRes || fetchRes.status === 403 || fetchRes.status === 401) {
+              fetchRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${creds.access_token}`
+                },
+                body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
+              });
+            }
           }
 
-          const fetchRes = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(bodyObj)
-          });
           const latencyMs = Date.now() - t0;
-          const status = fetchRes.status;
-          const ok = fetchRes.ok;
+          const status = fetchRes ? fetchRes.status : 500;
+          const ok = fetchRes ? fetchRes.ok : false;
           let message = ok ? 'Kết nối thành công (200 OK)' : `HTTP ${status}`;
           if (status === 403) {
-            const errData: any = await fetchRes.json().catch(() => ({}));
-            const errMsg = errData?.error?.message || '';
-            if (errMsg.includes('Verify your account')) {
-              message = '403: Cần Verify trên Google';
-            } else {
-              message = '403: Bị Google chặn quyền';
-            }
+            message = '403: Bị Google giới hạn quyền';
           } else if (status === 429) {
             message = '429: Hết Quota / Cooldown';
           }
@@ -209,6 +258,38 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
   });
 
+  // Export SQLite binary database
+  app.get('/api/backup/sqlite', (req: Request, res: Response) => {
+    try {
+      const buffer = manager.getStorage().exportSqliteBuffer();
+      res.setHeader('Content-Disposition', `attachment; filename=switch_google_${new Date().toISOString().slice(0, 10)}.sqlite`);
+      res.setHeader('Content-Type', 'application/vnd.sqlite3');
+      res.send(buffer);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Import SQLite binary database
+  app.post('/api/backup/sqlite', (req: Request, res: Response) => {
+    try {
+      let buffer: Buffer | null = null;
+      if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+        buffer = req.body;
+      } else if (req.body && typeof req.body.data === 'string') {
+        buffer = Buffer.from(req.body.data, 'base64');
+      }
+      if (!buffer) {
+        res.status(400).json({ error: 'Dữ liệu SQLite không hợp lệ' });
+        return;
+      }
+      manager.getStorage().importSqliteBuffer(buffer);
+      res.json({ success: true, message: 'Phục hồi cơ sở dữ liệu SQLite thành công!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Switch Ports Status & Management
   app.get('/api/ports', (req: Request, res: Response) => {
     const usageStats = usageTracker.getStats();
@@ -257,7 +338,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     res.json({ success: true, message: 'Logs cleared' });
   });
 
-  // Strategy management (round-robin / fallback / fixed)
+  // Strategy management (round-robin / least-traffic / fallback / fixed)
   app.get('/api/strategy', (req: Request, res: Response) => {
     res.json({
       strategy: rotator.getStrategy(),
@@ -267,12 +348,23 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
 
   app.post('/api/strategy', (req: Request, res: Response) => {
     const { strategy } = req.body;
-    if (!strategy || !['round-robin', 'fallback', 'fixed'].includes(strategy)) {
-      res.status(400).json({ error: 'Invalid strategy. Allowed: round-robin, fallback, fixed' });
+    if (!strategy || !['round-robin', 'least-traffic', 'fallback', 'fixed'].includes(strategy)) {
+      res.status(400).json({ error: 'Invalid strategy. Allowed: round-robin, least-traffic, fallback, fixed' });
       return;
     }
     rotator.setStrategy(strategy);
     res.json({ success: true, strategy: rotator.getStrategy() });
+  });
+
+  // Rotation configuration (requests per turn, tokens per turn, strategy)
+  app.get('/api/rotation/config', (req: Request, res: Response) => {
+    res.json(rotator.getRotationConfig());
+  });
+
+  app.post('/api/rotation/config', (req: Request, res: Response) => {
+    const { requestsPerTurn, tokensPerTurn, strategy } = req.body;
+    rotator.setRotationConfig({ requestsPerTurn, tokensPerTurn, strategy });
+    res.json({ success: true, config: rotator.getRotationConfig() });
   });
 
   // List all available profiles
@@ -331,6 +423,43 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     }
     const combo = manager.createCombo(name, strategy, models);
     res.json(combo);
+  });
+
+  // Update combo details
+  app.put('/api/combos/:id', (req: Request, res: Response) => {
+    const { name, strategy, models } = req.body;
+    const updated = manager.updateCombo(req.params.id, { name, strategy, models });
+    if (!updated) {
+      res.status(404).json({ error: 'Model Combo not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Add a model to combo
+  app.post('/api/combos/:id/models', (req: Request, res: Response) => {
+    const { model } = req.body;
+    if (!model || typeof model !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid "model"' });
+      return;
+    }
+    const updated = manager.addModelToCombo(req.params.id, model.trim());
+    if (!updated) {
+      res.status(404).json({ error: 'Model Combo not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Delete a model from combo
+  app.delete('/api/combos/:id/models/:model', (req: Request, res: Response) => {
+    const { id, model } = req.params;
+    const updated = manager.removeModelFromCombo(id, decodeURIComponent(model));
+    if (!updated) {
+      res.status(404).json({ error: 'Model Combo not found' });
+      return;
+    }
+    res.json(updated);
   });
 
   app.delete('/api/combos/:id', (req: Request, res: Response) => {

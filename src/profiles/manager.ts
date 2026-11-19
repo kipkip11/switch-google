@@ -48,6 +48,18 @@ export class ProfileManager {
     return this.storage.createCombo(name, strategy, models);
   }
 
+  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin'; models?: string[] }): ModelCombo | null {
+    return this.storage.updateCombo(id, updates);
+  }
+
+  public addModelToCombo(comboId: string, model: string): ModelCombo | null {
+    return this.storage.addModelToCombo(comboId, model);
+  }
+
+  public removeModelFromCombo(comboId: string, model: string): ModelCombo | null {
+    return this.storage.removeModelFromCombo(comboId, model);
+  }
+
   public deleteCombo(id: string): boolean {
     return this.storage.deleteCombo(id);
   }

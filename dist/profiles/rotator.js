@@ -1,16 +1,28 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountRotator = void 0;
+const tracker_1 = require("../usage/tracker");
 class AccountRotator {
     manager;
-    strategy = 'round-robin';
+    sqlite;
     currentIndex = 0;
     stats = new Map();
     disabledProfiles = new Set();
     currentlyServingAccount = null;
     lastServedAt = 0;
+    // Turn management (Số lượt gọi và token cho mỗi vòng)
+    currentTurnAccount = null;
+    currentTurnRequests = 0;
+    currentTurnTokens = 0;
     constructor(manager) {
         this.manager = manager;
+        this.sqlite = manager.getStorage().getSqlite();
+    }
+    getRotationConfig() {
+        return this.sqlite.getRotationConfig();
+    }
+    setRotationConfig(config) {
+        this.sqlite.setRotationConfig(config);
     }
     getCurrentlyServing() {
         return {
@@ -35,11 +47,17 @@ class AccountRotator {
         if (this.currentlyServingAccount === profileName) {
             this.currentlyServingAccount = null;
         }
+        if (this.currentTurnAccount === profileName) {
+            this.currentTurnAccount = null;
+            this.currentTurnRequests = 0;
+            this.currentTurnTokens = 0;
+        }
     }
     getPortStatuses() {
         const profiles = this.manager.listProfiles();
         const activeName = this.manager.getActiveProfileName();
         const now = Date.now();
+        const usage = tracker_1.usageTracker.getStats();
         return profiles.map((p, idx) => {
             const s = this.stats.get(p.name);
             const isBanned = s?.isBanned || false;
@@ -53,27 +71,29 @@ class AccountRotator {
                 linkStatus = 'banned';
             else if (isCooldown)
                 linkStatus = 'cooldown';
+            const accountTokens = usage.tokensByAccount[p.name] || (p.email ? usage.tokensByAccount[p.email] : 0) || 0;
             return {
                 portNumber: idx + 1,
                 profile: p.name,
                 email: p.email,
                 type: p.type,
                 isActiveDefault: p.name === activeName,
-                isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3000 && p.name === this.currentlyServingAccount),
+                isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3500 && p.name === this.currentlyServingAccount),
                 isDisabled,
                 linkStatus,
                 cooldownRemainingSeconds,
                 totalRequests: s?.totalRequests || 0,
                 failedRequests: s?.failedRequests || 0,
-                lastUsedAt: s?.lastUsedAt ? new Date(s.lastUsedAt).toLocaleTimeString() : undefined
+                lastUsedAt: s?.lastUsedAt ? new Date(s.lastUsedAt).toLocaleTimeString() : undefined,
+                totalTokens: accountTokens
             };
         });
     }
     getStrategy() {
-        return this.strategy;
+        return this.getRotationConfig().strategy;
     }
     setStrategy(strategy) {
-        this.strategy = strategy;
+        this.setRotationConfig({ strategy });
     }
     getStats() {
         const now = Date.now();
@@ -103,12 +123,22 @@ class AccountRotator {
         const s = this.getOrCreateStats(profileName);
         s.failedRequests += 1;
         s.cooldownUntil = Date.now() + durationSeconds * 1000;
-        console.warn(`[Rotator] Tài khoản [${profileName}] bị Rate Limit (429). Cooldown trong ${durationSeconds}s.`);
+        console.warn(`[Rotator] Tài khoản [${profileName}] cooldown trong ${durationSeconds}s.`);
+        // Reset turn nếu tài khoản bị cooldown
+        if (this.currentTurnAccount === profileName) {
+            this.currentTurnAccount = null;
+            this.currentTurnRequests = 0;
+            this.currentTurnTokens = 0;
+        }
     }
-    recordSuccess(profileName) {
+    recordSuccess(profileName, tokensUsed = 0) {
         const s = this.getOrCreateStats(profileName);
         s.totalRequests += 1;
         s.lastUsedAt = Date.now();
+        if (this.currentTurnAccount === profileName) {
+            this.currentTurnRequests += 1;
+            this.currentTurnTokens += tokensUsed;
+        }
     }
     clearCooldowns() {
         for (const [, s] of this.stats) {
@@ -120,7 +150,12 @@ class AccountRotator {
         s.failedRequests += 1;
         s.isBanned = true;
         s.cooldownUntil = Date.now() + 86400 * 1000; // 24h
-        console.warn(`[Rotator] Tài khoản [${profileName}] bị Google chặn vĩnh viễn (TOS/Permission/Validation). Loại bỏ khỏi vòng quay.`);
+        console.warn(`[Rotator] Tài khoản [${profileName}] tạm thời bị hạn chế quyền truy cập.`);
+        if (this.currentTurnAccount === profileName) {
+            this.currentTurnAccount = null;
+            this.currentTurnRequests = 0;
+            this.currentTurnTokens = 0;
+        }
     }
     async getAvailableAccounts() {
         const profiles = this.manager.listProfiles();
@@ -136,7 +171,7 @@ class AccountRotator {
                 return false;
             return !(s?.cooldownUntil && s.cooldownUntil > now);
         });
-        // Nếu tất cả tài khoản non-banned đều bị cooldown, reset cooldown các tài khoản non-banned để thử lại
+        // Nếu tất cả non-banned đều bị cooldown, mở lại để thử
         if (available.length === 0 && profiles.length > 0) {
             const nonBanned = profiles
                 .map((p) => p.name)
@@ -152,7 +187,6 @@ class AccountRotator {
         }
         const availableNames = (await this.getAvailableAccounts()).filter((name) => !excludedAccounts.includes(name));
         if (availableNames.length === 0) {
-            // Nếu tất cả tài khoản khả dụng đã bị excluded, thử lại từ các tài khoản chưa thử trong toàn bộ danh sách
             const fallbackRemaining = allProfiles
                 .map((p) => p.name)
                 .filter((name) => !excludedAccounts.includes(name));
@@ -161,20 +195,52 @@ class AccountRotator {
             }
             availableNames.push(...fallbackRemaining);
         }
+        const config = this.getRotationConfig();
         let targetName;
-        if (this.strategy === 'fixed') {
-            const activeName = this.manager.getActiveProfileName();
-            targetName = activeName && availableNames.includes(activeName) ? activeName : availableNames[0];
-        }
-        else if (this.strategy === 'fallback') {
-            // Ưu tiên theo thứ tự trong danh sách khả dụng
-            targetName = availableNames[0];
+        // Kiểm tra xem có cấu hình turn nhiều lượt liên tiếp không (requestsPerTurn > 1)
+        const isMultiTurn = config.requestsPerTurn > 1;
+        const canContinueCurrentTurn = isMultiTurn &&
+            this.currentTurnAccount &&
+            availableNames.includes(this.currentTurnAccount) &&
+            this.currentTurnRequests < config.requestsPerTurn &&
+            this.currentTurnTokens < config.tokensPerTurn;
+        if (canContinueCurrentTurn) {
+            targetName = this.currentTurnAccount;
+            this.currentTurnRequests += 1;
         }
         else {
-            // Round-Robin
-            this.currentIndex = this.currentIndex % availableNames.length;
-            targetName = availableNames[this.currentIndex];
-            this.currentIndex = (this.currentIndex + 1) % availableNames.length;
+            // Bắt đầu lượt mới cho tài khoản tiếp theo
+            if (config.strategy === 'least-traffic') {
+                // Cân bằng tải theo lưu lượng: chọn tài khoản có tổng token ít nhất
+                const usage = tracker_1.usageTracker.getStats();
+                const sortedByTraffic = [...availableNames].sort((a, b) => {
+                    const tokensA = usage.tokensByAccount[a] || 0;
+                    const tokensB = usage.tokensByAccount[b] || 0;
+                    if (tokensA !== tokensB)
+                        return tokensA - tokensB;
+                    // Nếu bằng token, ưu tiên tài khoản chưa dùng gần đây
+                    const statA = this.stats.get(a)?.lastUsedAt || 0;
+                    const statB = this.stats.get(b)?.lastUsedAt || 0;
+                    return statA - statB;
+                });
+                targetName = sortedByTraffic[0];
+            }
+            else if (config.strategy === 'fixed') {
+                const activeName = this.manager.getActiveProfileName();
+                targetName = activeName && availableNames.includes(activeName) ? activeName : availableNames[0];
+            }
+            else if (config.strategy === 'fallback') {
+                targetName = availableNames[0];
+            }
+            else {
+                // Round-robin
+                this.currentIndex = this.currentIndex % availableNames.length;
+                targetName = availableNames[this.currentIndex];
+                this.currentIndex = (this.currentIndex + 1) % availableNames.length;
+            }
+            this.currentTurnAccount = targetName;
+            this.currentTurnRequests = 1;
+            this.currentTurnTokens = 0;
         }
         const tokenData = await this.manager.getTokenForProfile(targetName);
         return {
@@ -186,9 +252,6 @@ class AccountRotator {
             expiry_date: tokenData.expiry_date
         };
     }
-    /**
-     * Tự động thử lại với tài khoản tiếp theo nếu tài khoản hiện tại gặp lỗi (429, 403, quota, token, v.v.)
-     */
     async executeWithFailover(fn) {
         const allProfiles = this.manager.listProfiles();
         const maxAttempts = Math.max(1, allProfiles.length);
@@ -200,14 +263,13 @@ class AccountRotator {
                 creds = await this.getNextAccount(triedAccounts);
             }
             catch (err) {
-                // Nếu lỗi lấy token của một account, loại account đó và thử tiếp
                 const remaining = allProfiles
                     .map((p) => p.name)
                     .filter((n) => !triedAccounts.includes(n));
                 if (remaining.length > 0) {
                     const badAccount = remaining[0];
                     triedAccounts.push(badAccount);
-                    this.markCooldown(badAccount, 300);
+                    this.markCooldown(badAccount, 120);
                     console.warn(`[Failover] Không lấy được token cho [${badAccount}]: ${err.message}. Thử tài khoản khác...`);
                     continue;
                 }
@@ -218,19 +280,20 @@ class AccountRotator {
             this.lastServedAt = Date.now();
             try {
                 const result = await fn(creds);
+                // Note: tokens used will be updated when usage is recorded
                 this.recordSuccess(creds.profile);
                 return { result, accountUsed: creds.profile };
             }
             catch (err) {
                 lastError = err;
                 const errMsg = err.message || '';
-                console.warn(`[Failover] Tài khoản [${creds.profile}] thất bại (${err.status || ''} ${errMsg.slice(0, 100)}). Chuyển sang tài khoản tiếp theo...`);
+                console.warn(`[Failover] Tài khoản [${creds.profile}] thất bại (${err.status || ''} ${errMsg.slice(0, 100)}). Chuyển tài khoản...`);
                 const isBannedIssue = errMsg.includes('TOS_VIOLATION') || errMsg.includes('VALIDATION_REQUIRED') || (err.status === 403 && errMsg.includes('PERMISSION_DENIED'));
                 if (isBannedIssue) {
                     this.markBanned(creds.profile);
                 }
                 else {
-                    const cooldownTime = err.status === 429 ? 60 : 30;
+                    const cooldownTime = err.status === 429 ? 60 : 20;
                     this.markCooldown(creds.profile, cooldownTime);
                 }
                 if (attempt < maxAttempts - 1) {

@@ -31,6 +31,15 @@ class ProfileManager {
     createCombo(name, strategy, models) {
         return this.storage.createCombo(name, strategy, models);
     }
+    updateCombo(id, updates) {
+        return this.storage.updateCombo(id, updates);
+    }
+    addModelToCombo(comboId, model) {
+        return this.storage.addModelToCombo(comboId, model);
+    }
+    removeModelFromCombo(comboId, model) {
+        return this.storage.removeModelFromCombo(comboId, model);
+    }
     deleteCombo(id) {
         return this.storage.deleteCombo(id);
     }

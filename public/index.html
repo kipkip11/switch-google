@@ -991,27 +991,160 @@
       overflow: visible;
     }
     .cable-idle {
-      stroke: rgba(71, 85, 105, 0.35);
+      stroke: rgba(100, 116, 139, 0.2);
       stroke-width: 1.5;
+      stroke-dasharray: 4, 6;
       fill: none;
-      transition: stroke 0.3s;
+      transition: all 0.4s ease;
     }
     .cable-disabled {
-      stroke: rgba(51, 65, 85, 0.25);
-      stroke-dasharray: 4, 4;
+      stroke: rgba(51, 65, 85, 0.15);
+      stroke-dasharray: 3, 5;
       stroke-width: 1;
       fill: none;
     }
-    .cable-active {
-      stroke: url(#grad-active-cable);
-      stroke-width: 3.5;
+    .cable-transmitting {
       fill: none;
-      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
-      stroke-dasharray: 8, 6;
-      animation: cableDash 0.7s linear infinite;
+      filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.9)) drop-shadow(0 0 20px rgba(168, 85, 247, 0.7));
+      stroke-dasharray: 14, 8;
+      animation: laserPulseFlow 0.6s linear infinite;
     }
-    @keyframes cableDash {
-      to { stroke-dashoffset: -28; }
+    @keyframes laserPulseFlow {
+      to { stroke-dashoffset: -44; }
+    }
+    .laser-badge-rect {
+      fill: rgba(15, 23, 42, 0.95);
+      stroke: #38bdf8;
+      stroke-width: 1;
+      rx: 6;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5));
+    }
+    .laser-badge-text {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      fill: #38bdf8;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+    /* Rotation Config Bar & Timeframe Filters */
+    .rotation-control-bar {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 12px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .timeframe-pill-group {
+      display: inline-flex;
+      background: rgba(10, 15, 28, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .timeframe-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .timeframe-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .timeframe-btn.active {
+      color: #0c111d;
+      background: var(--primary);
+      font-weight: 700;
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+    .noc-hud-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .noc-hud-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(8, 12, 22, 0.9));
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .noc-hud-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: var(--primary);
+      opacity: 0.8;
+    }
+    .noc-hud-card.purple::before { background: var(--purple); }
+    .noc-hud-card.green::before { background: var(--success); }
+    .noc-hud-card.amber::before { background: var(--warning); }
+    .noc-hud-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .noc-hud-value {
+      font-family: var(--font-mono);
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+    .noc-hud-subtext {
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      margin-top: 4px;
+    }
+    .model-chip-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: #e9d5ff;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      font-weight: 600;
+      margin: 3px;
+    }
+    .model-chip-remove {
+      background: none;
+      border: none;
+      color: #f87171;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 0 2px;
+      line-height: 1;
+      border-radius: 50%;
+      transition: color 0.15s;
+    }
+    .model-chip-remove:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.2);
     }
     .topo-ai-hub-col {
       width: 260px;
@@ -1185,10 +1318,14 @@
       <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="downloadBackup()" title="Xuất toàn bộ Profile, Tokens và Cấu hình ra file JSON">
         <span>💾</span> Sao Lưu
       </button>
-      <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="document.getElementById('file-import-backup').click()" title="Khôi phục dữ liệu từ file backup JSON">
-        <span>📥</span> Phục Hồi
+      <!-- SQLite Backup & Restore Buttons -->
+      <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="exportSqliteDatabase()" title="Tải file cơ sở dữ liệu SQLite (.sqlite)">
+        <span>💾</span> Xuất SQLite
       </button>
-      <input type="file" id="file-import-backup" accept=".json" onchange="handleBackupFile(event)" style="display:none;" />
+      <button class="btn-action" style="padding: 6px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;" onclick="document.getElementById('file-import-sqlite').click()" title="Khôi phục từ file SQLite (.sqlite)">
+        <span>📥</span> Nạp SQLite
+      </button>
+      <input type="file" id="file-import-sqlite" accept=".sqlite,.db" onchange="handleSqliteBackupFile(event)" style="display:none;" />
 
       <!-- 1-Click Copy Gateway Base URL -->
       <div class="gateway-pill" onclick="copyGatewayBaseUrl()" title="Bấm để sao chép Base URL">
@@ -1208,19 +1345,16 @@
     <!-- SUB-NAV SEGMENTED CONTROLS -->
     <div class="segmented-nav">
       <button class="nav-tab-btn active" id="tab-btn-switch" onclick="navigateTab('switch')">
-        🔌 1. Switch Rack & Luân Phiên <span class="tab-badge" id="badge-port-count">4</span>
+        🔌 1. Switch Rack & Cáp Laser <span class="tab-badge" id="badge-port-count">0</span>
       </button>
       <button class="nav-tab-btn" id="tab-btn-analytics" onclick="navigateTab('analytics')">
-        📊 2. Biểu Đồ Token Realtime
+        📊 2. Biểu Đồ Token Realtime (NOC HUD)
       </button>
-      <button class="nav-tab-btn" id="tab-btn-logs" onclick="navigateTab('logs')">
-        📜 3. Lịch Sử Sử Dụng <span class="tab-badge" id="badge-log-count">0</span>
+      <button class="nav-tab-btn" id="tab-btn-combos" onclick="navigateTab('combos')">
+        🧩 3. Model Combos
       </button>
       <button class="nav-tab-btn" id="tab-btn-keys" onclick="navigateTab('keys')">
         🔑 4. Virtual API Keys <span class="tab-badge" id="badge-key-count">1</span>
-      </button>
-      <button class="nav-tab-btn" id="tab-btn-combos" onclick="navigateTab('combos')">
-        🧩 5. Model Combos
       </button>
     </div>
 
@@ -1228,6 +1362,38 @@
     <!-- TAB 1: 1U MANAGED RACK SWITCH & BALANCING                -->
     <!-- ======================================================== -->
     <div class="view-pane active" id="pane-switch">
+      <!-- ROTATION & LOAD BALANCER CONFIG BAR -->
+      <div class="rotation-control-bar">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="font-weight: 700; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+            <span>⚖️</span>
+            <span>Chiến Lược Cân Bằng & Luân Phiên:</span>
+          </div>
+          <select id="config-rotation-strategy" class="input-box" style="padding: 5px 10px; font-size: 0.8rem; min-width: 220px;" onchange="saveRotationConfig()">
+            <option value="least-traffic">⚖️ Cân Bằng Lưu Lượng (Least-Traffic - San tải đều)</option>
+            <option value="round-robin">🔄 Luân Phiên Vòng Tròn (Round-Robin)</option>
+            <option value="fallback">🛡️ Dự Phòng Tuần Tự (Fallback)</option>
+            <option value="fixed">📌 Cố Định Một Cổng (Fixed Default)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+            <span style="color: var(--text-muted);">Số lượt đổi cổng:</span>
+            <input type="number" id="config-requests-per-turn" class="input-box" style="width: 70px; padding: 4px 8px; font-size: 0.8rem; text-align: center;" min="1" max="100" value="1" onchange="saveRotationConfig()" title="Số request liên tiếp 1 cổng xử lý trước khi đổi cổng" />
+            <span style="color: var(--text-muted); font-size: 0.72rem;">req/lượt</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+            <span style="color: var(--text-muted);">Hạn mức token/lượt:</span>
+            <input type="number" id="config-tokens-per-turn" class="input-box" style="width: 95px; padding: 4px 8px; font-size: 0.8rem; text-align: center;" min="1000" step="5000" value="50000" onchange="saveRotationConfig()" title="Hạn mức token tối đa cho 1 tài khoản trước khi chuyển cổng" />
+            <span style="color: var(--text-muted); font-size: 0.72rem;">tok/lượt</span>
+          </div>
+
+          <button class="btn-action primary" style="padding: 5px 12px; font-size: 0.78rem;" onclick="saveRotationConfig()">💾 Lưu Cấu Hình</button>
+        </div>
+      </div>
+
       <!-- 1U HARDWARE SWITCH CHASSIS -->
       <div class="rack-switch-chassis">
         <!-- Left Rack Mount Ear -->
@@ -1355,6 +1521,12 @@
                   <stop offset="50%" stop-color="#34d399" />
                   <stop offset="100%" stop-color="#a855f7" />
                 </linearGradient>
+                <linearGradient id="grad-laser-flow" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#38bdf8" />
+                  <stop offset="35%" stop-color="#a855f7" />
+                  <stop offset="70%" stop-color="#ec4899" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
               </defs>
               <g id="svg-paths-group"></g>
             </svg>
@@ -1438,97 +1610,98 @@
     </div>
 
     <!-- ======================================================== -->
-    <!-- TAB 2: BIỂU ĐỒ TOKEN REALTIME (ANALYTICS)                -->
+    <!-- TAB 2: BIỂU ĐỒ TOKEN REALTIME (NOC HUD MONITOR)          -->
     <!-- ======================================================== -->
     <div class="view-pane" id="pane-analytics">
-      <!-- 4 KPI Stat Cards -->
-      <div class="kpi-stats-grid">
-        <div class="kpi-card">
-          <div class="kpi-label">Tổng Tokens Tiêu Thụ</div>
-          <div class="kpi-value" id="kpi-total-tokens" style="color: #38bdf8;">0</div>
+      <!-- 4 NOC HUD Realtime Indicator Cards -->
+      <div class="noc-hud-grid">
+        <div class="noc-hud-card">
+          <div class="noc-hud-label">
+            <span>⚡ Tốc Độ Realtime</span>
+            <span style="color: var(--primary);">ACTIVE</span>
+          </div>
+          <div class="noc-hud-value" id="hud-tps" style="color: #38bdf8;">0 <span style="font-size: 0.8rem; font-weight: 600;">tok/s</span></div>
+          <div class="noc-hud-subtext">Lưu lượng token tức thời (10s qua)</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Prompt Tokens (Input)</div>
-          <div class="kpi-value" id="kpi-prompt-tokens" style="color: #60a5fa;">0</div>
+
+        <div class="noc-hud-card green">
+          <div class="noc-hud-label">
+            <span>⏱️ Độ Trễ Trung Bình</span>
+            <span style="color: var(--success);">LATENCY</span>
+          </div>
+          <div class="noc-hud-value" id="hud-latency" style="color: #34d399;">0 <span style="font-size: 0.8rem; font-weight: 600;">ms</span></div>
+          <div class="noc-hud-subtext">Thời gian phản hồi Google API</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Completion Tokens (Output)</div>
-          <div class="kpi-value" id="kpi-completion-tokens" style="color: #34d399;">0</div>
+
+        <div class="noc-hud-card purple">
+          <div class="noc-hud-label">
+            <span>📊 Tổng Input / Output</span>
+            <span style="color: var(--purple);">BANDWIDTH</span>
+          </div>
+          <div class="noc-hud-value" id="hud-io-ratio" style="color: #c084fc; font-size: 1.15rem;">0 / 0</div>
+          <div class="noc-hud-subtext">Tỷ lệ Prompt Tokens / Output Tokens</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Tổng Lượt Chuyển Mạch (Requests)</div>
-          <div class="kpi-value" id="kpi-total-reqs" style="color: #e2e8f0;">0</div>
+
+        <div class="noc-hud-card amber">
+          <div class="noc-hud-label">
+            <span>🔥 Cổng Tải Lớn Nhất</span>
+            <span style="color: var(--warning);">TOP LOAD</span>
+          </div>
+          <div class="noc-hud-value" id="hud-top-account" style="font-size: 1.05rem; color: #fbbf24; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Chưa có dữ liệu</div>
+          <div class="noc-hud-subtext" id="hud-top-account-tokens">0 Tokens gánh tải</div>
         </div>
       </div>
 
-      <!-- Main Timeline Chart -->
+      <!-- Main Timeline Chart with Neon Area & Timeframe Filter -->
       <div class="chart-container-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div>
-            <h3 style="font-size: 1.05rem; font-weight: 700;">📈 Lưu Lượng Token Theo Thời Gian (Timeline 24h)</h3>
-            <p style="font-size: 0.78rem; color: var(--text-muted);">Phân tách lưu lượng Input vs Output Tokens qua cổng proxy</p>
+            <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span>📈</span>
+              <span>Lưu Lượng Token Realtime (NOC Multi-Layer Wave)</span>
+            </h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+              Giám sát lưu lượng sóng Neon Input (Prompt) vs Output (Completion) theo khung thời gian
+            </p>
           </div>
-          <button class="btn-action" onclick="fetchAnalyticsData()">🔄 Làm Mới</button>
+
+          <!-- Timeframe Selector -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="timeframe-pill-group">
+              <button class="timeframe-btn" id="tf-btn-60s" onclick="switchTimeframe('60s')">60 Giây</button>
+              <button class="timeframe-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1 Giờ</button>
+              <button class="timeframe-btn" id="tf-btn-6h" onclick="switchTimeframe('6h')">6 Giờ</button>
+              <button class="timeframe-btn active" id="tf-btn-24h" onclick="switchTimeframe('24h')">24 Giờ</button>
+            </div>
+            <button class="btn-action" onclick="fetchAnalyticsData()">🔄 Làm Mới</button>
+          </div>
         </div>
-        <div style="height: 290px; width: 100%;">
+
+        <div style="height: 310px; width: 100%;">
           <canvas id="canvas-timeline-chart"></canvas>
         </div>
       </div>
 
       <!-- Breakdown Charts Row -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px;">
         <div class="chart-container-card">
-          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">🧠 Tỷ Trọng Tokens Theo Model</h3>
-          <div style="height: 240px; display: flex; align-items: center; justify-content: center;">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>🧠</span>
+            <span>Tỷ Trọng Token Theo Model</span>
+          </h3>
+          <div style="height: 250px; display: flex; align-items: center; justify-content: center;">
             <canvas id="canvas-model-chart"></canvas>
           </div>
         </div>
 
         <div class="chart-container-card">
-          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px;">🔌 Tải Tokens Qua Từng Cổng Switch</h3>
-          <div style="height: 240px;">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>🔌</span>
+            <span>Phân Bổ Lưu Lượng Qua Từng Cổng Switch</span>
+          </h3>
+          <div style="height: 250px;">
             <canvas id="canvas-account-chart"></canvas>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ======================================================== -->
-    <!-- TAB 3: AUDIT LOG DATA GRID                               -->
-    <!-- ======================================================== -->
-    <div class="view-pane" id="pane-logs">
-      <div class="chart-container-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
-          <div>
-            <h3 style="font-size: 1.05rem; font-weight: 700;">📜 Nhật Ký Token & Giao Dịch Chuyển Mạch (Audit Log)</h3>
-            <p style="font-size: 0.78rem; color: var(--text-muted);">Lịch sử gọi API chi tiết của Hermes Agent, Cursor, Claude Code</p>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" id="log-search-field" class="input-box" placeholder="Tìm theo model hoặc email..." style="max-width: 240px; padding: 6px 12px; font-size: 0.8rem;" oninput="onSearchLogs()" />
-            <button class="btn-action" onclick="fetchAuditLogs()">🔄 Làm Mới</button>
-            <button class="btn-action danger" onclick="confirmClearLogs()">🗑️ Xóa Nhật Ký</button>
-          </div>
-        </div>
-
-        <div style="overflow-x: auto;">
-          <table class="data-grid-table">
-            <thead>
-              <tr>
-                <th>Thời Gian</th>
-                <th>Cổng Switch (Port)</th>
-                <th>Model</th>
-                <th>Prompt In</th>
-                <th>Output</th>
-                <th>Tổng Token</th>
-                <th>Độ Trễ</th>
-                <th>Status</th>
-                <th>Stream</th>
-              </tr>
-            </thead>
-            <tbody id="logs-grid-body">
-              <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang tải nhật ký...</td></tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -1748,7 +1921,6 @@
 
       if (tabKey === 'switch') setTimeout(() => { if (cachedPorts.length > 0) drawSvgCables(cachedPorts, cachedActiveProfile); }, 60);
       if (tabKey === 'analytics') fetchAnalyticsData();
-      if (tabKey === 'logs') fetchAuditLogs();
       if (tabKey === 'keys') fetchApiKeys();
       if (tabKey === 'combos') fetchCombos();
     }
@@ -1822,16 +1994,31 @@
 
     let cachedPorts = [];
     let cachedActiveProfile = null;
+    let liveTrafficData = null;
+    let selectedTimeframe = '24h';
+    let rotationConfigLoaded = false;
 
     // --- SWITCH ENGINE SYNC ---
     async function fetchSwitchStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status?timeframe=' + selectedTimeframe);
         const data = await res.json();
+        liveTrafficData = data.liveTraffic || null;
 
         applyStrategyVisual(data.strategy);
         renderChassisPorts(data.ports || [], data.serving);
         renderAiTopology(data.ports || [], data.serving);
+
+        // Sync rotation config values once on load
+        if (!rotationConfigLoaded && data.rotationConfig) {
+          const stratEl = document.getElementById('config-rotation-strategy');
+          const reqEl = document.getElementById('config-requests-per-turn');
+          const tokEl = document.getElementById('config-tokens-per-turn');
+          if (stratEl) stratEl.value = data.rotationConfig.strategy;
+          if (reqEl) reqEl.value = data.rotationConfig.requestsPerTurn;
+          if (tokEl) tokEl.value = data.rotationConfig.tokensPerTurn;
+          rotationConfigLoaded = true;
+        }
 
         // Update 3rd-party SFP+ Uplink tokens
         const uplinkTokensEl = document.getElementById('sfp-token-val');
@@ -1861,9 +2048,6 @@
             modelBadgeEl.innerText = 'Gemini 3.8 Flash (Active)';
           }
         }
-
-        // Keep audit logs table synchronized
-        fetchAuditLogs();
       } catch (_) {}
     }
 
@@ -2045,6 +2229,7 @@
       const targetY = H / 2;
 
       let pathsHtml = '';
+      let badgesHtml = '';
 
       ports.forEach((p, idx) => {
         const pinEl = document.getElementById(`topo-pin-${idx}`);
@@ -2059,20 +2244,46 @@
         const cp2x = W * 0.55;
         const d = `M ${startX},${startY} C ${cp1x},${startY} ${cp2x},${endY} ${endX},${endY}`;
 
-        const isActive = p.profile === activeProfile;
         const isDown = p.isDisabled;
         const health = realHealthResults[p.profile];
         const isError = health && !health.ok;
 
-        let pathClass = 'cable-idle';
-        if (isDown) pathClass = 'cable-disabled';
-        else if (isError) pathClass = 'cable-error';
-        else if (isActive) pathClass = 'cable-active';
+        // CHỈ KHI NÀO CÓ TOKEN ĐƯỢC SỬ DỤNG MỚI BẬT ĐƯỜNG TRUYỀN LASER
+        const isTransmitting = liveTrafficData && liveTrafficData.isTransmitting && 
+          (liveTrafficData.account === p.profile || liveTrafficData.account === p.email);
 
-        pathsHtml += `<path d="${d}" class="${pathClass}" />`;
+        if (isTransmitting) {
+          const tokVal = liveTrafficData.tokens || 100;
+          // Độ dày tia laser tỷ lệ thuận với số lượng token (từ 3px đến 8.5px)
+          const strokeWidth = Math.min(8.5, Math.max(3, 2.5 + Math.log10(tokVal) * 1.5)).toFixed(1);
+          // Tốc độ hạt photon chạy tỷ lệ với lưu lượng (nhiều token chạy nhanh hơn: 0.35s - 0.75s)
+          const animDuration = Math.max(0.35, Math.min(0.75, 1.1 - Math.log10(tokVal) * 0.18)).toFixed(2);
+
+          pathsHtml += `<path d="${d}" class="cable-transmitting" stroke="url(#grad-laser-flow)" stroke-width="${strokeWidth}" style="animation-duration: ${animDuration}s;" />`;
+
+          // Huy hiệu lưu lượng token nổi trên đường truyền
+          const midX = W * 0.5;
+          const midY = (startY + endY) / 2;
+          const badgeText = `⚡ +${formatTokens(tokVal)} tok (${liveTrafficData.model || 'Gemini'})`;
+          const badgeWidth = Math.max(105, badgeText.length * 7.2);
+
+          badgesHtml += `
+            <g transform="translate(${midX - badgeWidth / 2}, ${midY - 12})">
+              <rect width="${badgeWidth}" height="24" class="laser-badge-rect" />
+              <text x="${badgeWidth / 2}" y="12" class="laser-badge-text">${badgeText}</text>
+            </g>
+          `;
+        } else if (isDown) {
+          pathsHtml += `<path d="${d}" class="cable-disabled" />`;
+        } else if (isError) {
+          pathsHtml += `<path d="${d}" class="cable-error" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4" fill="none" />`;
+        } else {
+          // Trạng thái chờ tĩnh (idle standby) khi không có request
+          pathsHtml += `<path d="${d}" class="cable-idle" />`;
+        }
       });
 
-      pathsGroup.innerHTML = pathsHtml;
+      pathsGroup.innerHTML = pathsHtml + badgesHtml;
     }
 
     async function runPingAllPorts() {
@@ -2233,15 +2444,50 @@
     }
 
     // --- ANALYTICS DATA & CHARTS ---
+    function switchTimeframe(tf) {
+      selectedTimeframe = tf;
+      ['60s', '1h', '6h', '24h'].forEach(t => {
+        const btn = document.getElementById(`tf-btn-${t}`);
+        if (btn) btn.classList.toggle('active', t === tf);
+      });
+      fetchAnalyticsData();
+    }
+
     async function fetchAnalyticsData() {
       try {
-        const res = await fetch('/api/usage/stats');
+        const res = await fetch('/api/usage/realtime?timeframe=' + selectedTimeframe);
         const data = await res.json();
 
-        document.getElementById('kpi-total-tokens').innerText = Number(data.totalTokens || 0).toLocaleString();
-        document.getElementById('kpi-prompt-tokens').innerText = Number(data.totalPromptTokens || 0).toLocaleString();
-        document.getElementById('kpi-completion-tokens').innerText = Number(data.totalCompletionTokens || 0).toLocaleString();
-        document.getElementById('kpi-total-reqs').innerText = Number(data.totalRequests || 0).toLocaleString();
+        // Update HUD Metrics
+        const tpsEl = document.getElementById('hud-tps');
+        if (tpsEl) {
+          tpsEl.innerHTML = `${(data.tokensPerSecond || 0).toLocaleString()} <span style="font-size: 0.8rem; font-weight: 600;">tok/s</span>`;
+        }
+
+        const latEl = document.getElementById('hud-latency');
+        if (latEl) {
+          latEl.innerHTML = `${data.avgLatencyMs || 0} <span style="font-size: 0.8rem; font-weight: 600;">ms</span>`;
+        }
+
+        const ioEl = document.getElementById('hud-io-ratio');
+        if (ioEl) {
+          ioEl.innerText = `${formatTokens(data.totalPromptTokens || 0)} / ${formatTokens(data.totalCompletionTokens || 0)}`;
+        }
+
+        // Top Account Load
+        const topAccEl = document.getElementById('hud-top-account');
+        const topAccTokensEl = document.getElementById('hud-top-account-tokens');
+        if (topAccEl && topAccTokensEl) {
+          const accEntries = Object.entries(data.tokensByAccount || {});
+          accEntries.sort((a, b) => b[1] - a[1]);
+          if (accEntries.length > 0) {
+            topAccEl.innerText = accEntries[0][0];
+            topAccTokensEl.innerText = `${Number(accEntries[0][1]).toLocaleString()} Tokens gánh tải`;
+          } else {
+            topAccEl.innerText = 'Cân bằng tải đồng đều';
+            topAccTokensEl.innerText = '0 Tokens gánh tải';
+          }
+        }
 
         drawTimelineChart(data.timeSeries || []);
         drawModelDonut(data.tokensByModel || {});
@@ -2257,53 +2503,142 @@
       const promptValues = series.map(s => s.promptTokens);
       const completionValues = series.map(s => s.completionTokens);
 
-      const gradPrompt = ctx.createLinearGradient(0, 0, 0, 280);
-      gradPrompt.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
-      gradPrompt.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+      const gradPrompt = ctx.createLinearGradient(0, 0, 0, 300);
+      gradPrompt.addColorStop(0, 'rgba(6, 182, 212, 0.45)');
+      gradPrompt.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
-      const gradComp = ctx.createLinearGradient(0, 0, 0, 280);
-      gradComp.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-      gradComp.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+      const gradComp = ctx.createLinearGradient(0, 0, 0, 300);
+      gradComp.addColorStop(0, 'rgba(168, 85, 247, 0.55)');
+      gradComp.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
 
       chartTimelineObj = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: labels.length ? labels : ['00:00', '06:00', '12:00', '18:00', '24:00'],
+          labels: labels.length ? labels : ['--:--'],
           datasets: [
             {
-              label: 'Prompt In',
-              data: promptValues.length ? promptValues : [0, 0, 0, 0, 0],
-              borderColor: '#38bdf8',
+              label: 'Prompt Tokens (Input)',
+              data: promptValues.length ? promptValues : [0],
+              borderColor: '#06b6d4',
               backgroundColor: gradPrompt,
               fill: true,
               tension: 0.35,
-              borderWidth: 2,
-              pointRadius: 3
+              borderWidth: 2.2,
+              pointRadius: 2.5,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#06b6d4'
             },
             {
-              label: 'Output Tokens',
-              data: completionValues.length ? completionValues : [0, 0, 0, 0, 0],
-              borderColor: '#10b981',
+              label: 'Completion Tokens (Output)',
+              data: completionValues.length ? completionValues : [0],
+              borderColor: '#a855f7',
               backgroundColor: gradComp,
               fill: true,
               tension: 0.35,
-              borderWidth: 2,
-              pointRadius: 3
+              borderWidth: 2.2,
+              pointRadius: 2.5,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#a855f7'
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
           plugins: {
-            legend: { labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', weight: '600' } } }
+            legend: {
+              labels: {
+                color: '#94a3b8',
+                font: { family: 'Plus Jakarta Sans', weight: '600', size: 12 },
+                boxWidth: 12,
+                usePointStyle: true
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(6, 9, 17, 0.95)',
+              titleColor: '#38bdf8',
+              bodyColor: '#f8fafc',
+              borderColor: 'rgba(56, 189, 248, 0.3)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true
+            }
           },
           scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } },
-            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } } }
+            x: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#94a3b8',
+                font: { family: 'JetBrains Mono', size: 11 },
+                callback: (val) => formatTokens(val)
+              }
+            }
           }
         }
       });
+    }
+
+    // --- SQLITE BACKUP & ROTATION CONFIG ---
+    function exportSqliteDatabase() {
+      toast('Đang xuất tệp cơ sở dữ liệu SQLite (.sqlite)...');
+      window.location.href = '/api/backup/sqlite';
+    }
+
+    async function handleSqliteBackupFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!confirm(`Bạn có chắc muốn phục hồi cơ sở dữ liệu từ file SQLite "${file.name}"? Dữ liệu hiện tại sẽ được cập nhật.`)) return;
+
+      toast('Đang nạp file SQLite...');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const res = await fetch('/api/backup/sqlite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.sqlite3' },
+          body: arrayBuffer
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast('✓ Phục hồi cơ sở dữ liệu SQLite thành công!');
+          fetchSwitchStatus();
+          fetchCombos();
+          fetchApiKeys();
+          fetchAnalyticsData();
+        } else {
+          alert('Lỗi: ' + (data.error || 'Không thể phục hồi SQLite'));
+        }
+      } catch (err) {
+        alert('Lỗi khi nạp file SQLite: ' + err.message);
+      }
+      event.target.value = '';
+    }
+
+    async function saveRotationConfig() {
+      const strategy = document.getElementById('config-rotation-strategy').value;
+      const requestsPerTurn = parseInt(document.getElementById('config-requests-per-turn').value, 10) || 1;
+      const tokensPerTurn = parseInt(document.getElementById('config-tokens-per-turn').value, 10) || 50000;
+
+      try {
+        const res = await fetch('/api/rotation/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strategy, requestsPerTurn, tokensPerTurn })
+        });
+        if (res.ok) {
+          toast('✓ Đã cập nhật cấu hình luân phiên & cân bằng tải!');
+          fetchSwitchStatus();
+        }
+      } catch (err) {
+        toast('Lỗi lưu cấu hình: ' + err.message);
+      }
     }
 
     function drawModelDonut(modelsMap) {
@@ -2542,20 +2877,96 @@
       }
 
       deck.innerHTML = combos.map(c => `
-        <div style="background: rgba(11, 17, 30, 0.85); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="background: rgba(11, 17, 30, 0.85); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #c084fc; font-size: 1rem;">${c.name}</strong>
-            <span class="pill-badge pill-model">${c.strategy.toUpperCase()}</span>
+            <strong style="color: #c084fc; font-size: 1.05rem;">${c.name}</strong>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="pill-badge pill-model">${c.strategy.toUpperCase()}</span>
+              <button class="btn-action" style="padding: 2px 7px; font-size: 0.72rem;" onclick="editComboPrompt('${c.id}', '${c.name}', '${c.strategy}')" title="Sửa tên hoặc chiến lược">✏️ Sửa</button>
+            </div>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #93c5fd; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
-            ${c.models.map((m, i) => `${i + 1}. ${m}`).join('<br/>')}
+
+          <!-- Chip list of models in combo -->
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; min-height: 48px;">
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Danh sách Model (${c.models.length}):</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+              ${c.models.map(m => `
+                <span class="model-chip-tag">
+                  <span>${m}</span>
+                  <button class="model-chip-remove" onclick="removeModelFromCombo('${c.id}', '${m}')" title="Xóa model [${m}] khỏi combo">✕</button>
+                </span>
+              `).join('')}
+            </div>
           </div>
-          <div style="display: flex; gap: 8px; margin-top: auto;">
-            <button class="btn-action" style="flex: 1; padding: 5px;" onclick="copyPlain('${c.name}')">Copy Tên Model</button>
-            <button class="btn-action danger" style="padding: 5px 10px;" onclick="removeCombo('${c.id}')">✕</button>
+
+          <!-- Add custom model to combo -->
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input type="text" id="input-add-model-${c.id}" class="input-box" placeholder="Thêm model (vd: gemini-2.5-pro)..." style="font-size: 0.76rem; padding: 5px 8px; flex: 1;" onkeydown="if(event.key==='Enter') submitAddModel('${c.id}')" />
+            <button class="btn-action primary" style="padding: 5px 10px; font-size: 0.76rem; white-space: nowrap;" onclick="submitAddModel('${c.id}')">➕ Thêm</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.05);">
+            <button class="btn-action" style="flex: 1; padding: 5px; font-size: 0.75rem;" onclick="copyPlain('${c.name}')">📋 Copy Tên Model</button>
+            <button class="btn-action danger" style="padding: 5px 10px; font-size: 0.75rem;" onclick="removeCombo('${c.id}')" title="Xóa toàn bộ combo">🗑️ Xóa</button>
           </div>
         </div>
       `).join('');
+    }
+
+    async function submitAddModel(comboId) {
+      const input = document.getElementById(`input-add-model-${comboId}`);
+      if (!input) return;
+      const model = input.value.trim();
+      if (!model) return toast('Vui lòng nhập tên model cần thêm');
+
+      try {
+        const res = await fetch(`/api/combos/${encodeURIComponent(comboId)}/models`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model })
+        });
+        if (res.ok) {
+          toast(`✓ Đã thêm model [${model}] vào combo`);
+          fetchCombos();
+        } else {
+          const err = await res.json();
+          toast('Lỗi: ' + (err.error || 'Không thể thêm model'));
+        }
+      } catch (err) {
+        toast('Lỗi kết nối: ' + err.message);
+      }
+    }
+
+    async function removeModelFromCombo(comboId, model) {
+      if (!confirm(`Xóa model [${model}] khỏi Combo này?`)) return;
+      try {
+        const res = await fetch(`/api/combos/${encodeURIComponent(comboId)}/models/${encodeURIComponent(model)}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          toast(`✓ Đã xóa model [${model}]`);
+          fetchCombos();
+        }
+      } catch (_) {}
+    }
+
+    async function editComboPrompt(comboId, currentName, currentStrategy) {
+      const newName = prompt('Nhập tên mới cho Combo:', currentName);
+      if (newName === null || !newName.trim()) return;
+      const newStrat = prompt('Nhập chiến lược (fallback hoặc round-robin):', currentStrategy) || currentStrategy;
+      try {
+        const res = await fetch(`/api/combos/${encodeURIComponent(comboId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim(), strategy: newStrat.trim() })
+        });
+        if (res.ok) {
+          toast('✓ Đã cập nhật Combo!');
+          fetchCombos();
+        }
+      } catch (err) {
+        toast('Lỗi: ' + err.message);
+      }
     }
 
     function applySmartPreset(presetKey) {
