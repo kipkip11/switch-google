@@ -146,6 +146,29 @@ program
         process.exit(1);
     }
 });
+// Command: upgrade-web (Chuyển đổi tài khoản OAuth bị chặn sang Web Mode)
+program
+    .command('upgrade-web <profile_name>')
+    .description('Chuyển đổi tài khoản OAuth bị chặn sang Gemini Web Mode để vượt chặn Antigravity')
+    .action(async (profileName) => {
+    try {
+        const raw = manager.getRawProfile(profileName);
+        if (!raw) {
+            console.error(`\n✗ Lỗi: Profile '${profileName}' không tồn tại.`);
+            process.exit(1);
+        }
+        console.log(`\n🚀 Đang mở trình duyệt để chuyển tài khoản [${profileName}] (${raw.email}) sang Gemini Web Mode...`);
+        const { autoCaptureGeminiWebSession } = await Promise.resolve().then(() => __importStar(require('./services/webAuthAutomator')));
+        const captured = await autoCaptureGeminiWebSession(180000, raw.email);
+        const prof = manager.upgradeOauthToWebSession(profileName, captured.cookies, captured.email);
+        console.log(`\n✓ Đã nâng cấp tài khoản [${prof.name}] sang Gemini Web Mode thành công!`);
+        process.exit(0);
+    }
+    catch (err) {
+        console.error(`\n✗ Lỗi: ${err.message}`);
+        process.exit(1);
+    }
+});
 // Command: list
 program
     .command('list')
@@ -171,7 +194,10 @@ program
         console.log('  ' + '-'.repeat(105));
         for (const p of profiles) {
             const marker = p.isActive ? '  *   ' : '      ';
-            const status = p.isExpired ? 'Hết hạn (Sẽ tự refresh)' : 'Hoạt động';
+            let status = p.isExpired ? 'Hết hạn (Sẽ tự refresh)' : 'Hoạt động';
+            if (p.isBlockedAntigravity && p.type === 'oauth') {
+                status = '⚠️ Bị chặn Antigravity (Cần Web Mode)';
+            }
             console.log(marker +
                 p.name.padEnd(18) +
                 p.type.toUpperCase().padEnd(12) +

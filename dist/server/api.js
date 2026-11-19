@@ -585,6 +585,78 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             res.status(500).json({ error: err.message });
         }
     });
+    // Kiểm tra trạng thái Antigravity của một tài khoản cụ thể
+    app.post('/api/profiles/:profile/check-antigravity', async (req, res) => {
+        try {
+            const profile = req.params.profile;
+            const raw = manager.getRawProfile(profile);
+            if (!raw) {
+                return res.status(404).json({ error: `Profile '${profile}' không tồn tại` });
+            }
+            if (raw.type === 'web_session') {
+                return res.json({
+                    profile,
+                    type: raw.type,
+                    isBlockedAntigravity: false,
+                    status: 200,
+                    message: 'Tài khoản Web Session hoạt động bình thường'
+                });
+            }
+            const tokenData = await manager.getTokenForProfile(profile);
+            const health = await manager.checkAntigravityHealth(tokenData.access_token);
+            const isBlocked = !health.ok && health.status === 403;
+            manager.setBlockedAntigravity(profile, isBlocked);
+            if (isBlocked) {
+                rotator.markBanned(profile);
+            }
+            else if (health.ok) {
+                rotator.unbanAccount(profile);
+            }
+            res.json({
+                profile,
+                type: raw.type,
+                isBlockedAntigravity: isBlocked,
+                status: health.status,
+                message: isBlocked
+                    ? 'Tài khoản bị Google chặn Antigravity / CloudCode (TOS hoặc Bản quyền)'
+                    : (health.ok ? 'Tài khoản hoạt động tốt với Antigravity' : (health.message || 'Lỗi không xác định'))
+            });
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Nâng cấp / chuyển đổi tài khoản OAuth bị chặn sang Web Mode (1-Click)
+    app.post('/api/profiles/:profile/upgrade-web', async (req, res) => {
+        if (isWebLoginInProgress) {
+            return res.status(409).json({
+                error: 'Đang có một tiến trình đăng nhập Web Mode khác đang mở. Vui lòng hoàn tất hoặc đóng cửa sổ trình duyệt hiện tại.'
+            });
+        }
+        const profile = req.params.profile;
+        const raw = manager.getRawProfile(profile);
+        if (!raw) {
+            return res.status(404).json({ error: `Profile '${profile}' không tồn tại` });
+        }
+        isWebLoginInProgress = true;
+        try {
+            const captured = await (0, webAuthAutomator_1.autoCaptureGeminiWebSession)(180000, raw.email);
+            const upgraded = manager.upgradeOauthToWebSession(profile, captured.cookies, captured.email);
+            rotator.unbanAccount(profile);
+            res.json({
+                success: true,
+                profile: upgraded,
+                email: captured.email,
+                message: `Đã chuyển đổi tài khoản [${profile}] sang Gemini Web Mode thành công!`
+            });
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+        finally {
+            isWebLoginInProgress = false;
+        }
+    });
     // Delete a profile
     app.delete('/api/profiles/:profile', (req, res) => {
         try {

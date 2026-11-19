@@ -107,7 +107,8 @@ class FallbackSqliteDb {
             cookies: args[4] || null,
             tokens_json: args[5],
             created_at: args[6],
-            updated_at: args[7]
+            updated_at: args[7],
+            is_blocked_antigravity: args[8] !== undefined ? args[8] : 0
           };
           this.persist();
           return { changes: 1 };
@@ -460,6 +461,7 @@ export class SqliteStorage {
         type TEXT,
         api_key TEXT,
         cookies TEXT,
+        is_blocked_antigravity INTEGER DEFAULT 0,
         tokens_json TEXT,
         created_at INTEGER,
         updated_at INTEGER
@@ -653,6 +655,7 @@ export class SqliteStorage {
         type: r.type,
         apiKey: r.api_key || undefined,
         cookies: r.cookies || undefined,
+        isBlockedAntigravity: r.is_blocked_antigravity === 1,
         tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
         createdAt: r.created_at,
         updatedAt: r.updated_at
@@ -668,6 +671,7 @@ export class SqliteStorage {
           type: r.type,
           apiKey: r.api_key || undefined,
           cookies: r.cookies || undefined,
+          isBlockedAntigravity: r.is_blocked_antigravity === 1,
           tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
           createdAt: r.created_at,
           updatedAt: r.updated_at
@@ -689,6 +693,7 @@ export class SqliteStorage {
         type: r.type,
         apiKey: r.api_key || undefined,
         cookies: r.cookies || undefined,
+        isBlockedAntigravity: r.is_blocked_antigravity === 1,
         tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
         createdAt: r.created_at,
         updatedAt: r.updated_at
@@ -704,6 +709,7 @@ export class SqliteStorage {
           type: r.type,
           apiKey: r.api_key || undefined,
           cookies: r.cookies || undefined,
+          isBlockedAntigravity: r.is_blocked_antigravity === 1,
           tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
           createdAt: r.created_at,
           updatedAt: r.updated_at
@@ -718,11 +724,14 @@ export class SqliteStorage {
     try {
       this.db.prepare('ALTER TABLE profiles ADD COLUMN cookies TEXT;').run();
     } catch (_) {}
+    try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN is_blocked_antigravity INTEGER DEFAULT 0;').run();
+    } catch (_) {}
 
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO profiles 
-      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at, is_blocked_antigravity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       profile.name,
@@ -732,7 +741,8 @@ export class SqliteStorage {
       profile.cookies || null,
       JSON.stringify(profile.tokens || {}),
       profile.createdAt || Date.now(),
-      profile.updatedAt || Date.now()
+      profile.updatedAt || Date.now(),
+      profile.isBlockedAntigravity ? 1 : 0
     );
   }
 

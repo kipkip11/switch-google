@@ -80,6 +80,7 @@ class AccountRotator {
                 isActiveDefault: p.name === activeName,
                 isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3500 && p.name === this.currentlyServingAccount),
                 isDisabled,
+                isBlockedAntigravity: p.isBlockedAntigravity || false,
                 linkStatus,
                 cooldownRemainingSeconds,
                 totalRequests: s?.totalRequests || 0,
@@ -157,25 +158,34 @@ class AccountRotator {
             this.currentTurnTokens = 0;
         }
     }
+    unbanAccount(profileName) {
+        const s = this.stats.get(profileName);
+        if (s) {
+            s.isBanned = false;
+            s.cooldownUntil = 0;
+        }
+    }
     async getAvailableAccounts() {
         const profiles = this.manager.listProfiles();
         const now = Date.now();
-        // Lọc ra các tài khoản không bị disable thủ công, không bị ban và không bị cooldown
+        // Lọc ra các tài khoản không bị disable thủ công, không bị ban, không bị chặn Antigravity (nếu còn tài khoản khác) và không bị cooldown
         const available = profiles
-            .map((p) => p.name)
-            .filter((name) => {
-            if (this.disabledProfiles.has(name))
+            .filter((p) => {
+            if (this.disabledProfiles.has(p.name))
                 return false;
-            const s = this.stats.get(name);
+            const s = this.stats.get(p.name);
             if (s?.isBanned)
                 return false;
+            if (p.isBlockedAntigravity && p.type === 'oauth')
+                return false;
             return !(s?.cooldownUntil && s.cooldownUntil > now);
-        });
-        // Nếu tất cả non-banned đều bị cooldown, mở lại để thử
+        })
+            .map((p) => p.name);
+        // Nếu tất cả tài khoản sạch đều hết, mở lại các tài khoản non-banned để thử
         if (available.length === 0 && profiles.length > 0) {
             const nonBanned = profiles
-                .map((p) => p.name)
-                .filter((name) => !this.disabledProfiles.has(name) && !this.stats.get(name)?.isBanned);
+                .filter((p) => !this.disabledProfiles.has(p.name) && !this.stats.get(p.name)?.isBanned)
+                .map((p) => p.name);
             return nonBanned.length > 0 ? nonBanned : profiles.map((p) => p.name);
         }
         return available;
@@ -289,9 +299,14 @@ class AccountRotator {
                 lastError = err;
                 const errMsg = err.message || '';
                 console.warn(`[Failover] Tài khoản [${creds.profile}] thất bại (${err.status || ''} ${errMsg.slice(0, 100)}). Chuyển tài khoản...`);
-                const isBannedIssue = errMsg.includes('TOS_VIOLATION') || errMsg.includes('VALIDATION_REQUIRED') || (err.status === 403 && errMsg.includes('PERMISSION_DENIED'));
+                const isBannedIssue = errMsg.includes('TOS_VIOLATION') ||
+                    errMsg.includes('VALIDATION_REQUIRED') ||
+                    errMsg.includes('Terms of Service') ||
+                    errMsg.includes('SUBSCRIPTION_REQUIRED') ||
+                    (err.status === 403 && errMsg.includes('PERMISSION_DENIED'));
                 if (isBannedIssue) {
                     this.markBanned(creds.profile);
+                    this.manager.setBlockedAntigravity(creds.profile, true);
                 }
                 else {
                     const cooldownTime = err.status === 429 ? 60 : 20;

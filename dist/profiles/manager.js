@@ -64,6 +64,7 @@ class ProfileManager {
                 isActive: data.activeProfile === name,
                 isExpired,
                 expiresAt,
+                isBlockedAntigravity: prof.isBlockedAntigravity || false,
                 createdAt: new Date(prof.createdAt).toLocaleString()
             });
         }
@@ -81,17 +82,86 @@ class ProfileManager {
         data.activeProfile = name;
         this.storage.save(data);
     }
+    getRawProfile(name) {
+        const data = this.storage.load();
+        return data.profiles[name] || null;
+    }
+    setBlockedAntigravity(profileName, blocked) {
+        const data = this.storage.load();
+        const prof = data.profiles[profileName];
+        if (prof) {
+            prof.isBlockedAntigravity = blocked;
+            prof.updatedAt = Date.now();
+            data.profiles[profileName] = prof;
+            this.storage.save(data);
+        }
+    }
+    async checkAntigravityHealth(accessToken) {
+        try {
+            const res = await fetch('https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({
+                    project: 'aicode-consumers',
+                    model: 'gemini-3.8-flash-high',
+                    userAgent: 'antigravity',
+                    request: {
+                        contents: [{ role: 'user', parts: [{ text: 'ping' }] }]
+                    }
+                })
+            });
+            if (res.ok) {
+                return { ok: true, status: 200 };
+            }
+            const text = await res.text();
+            return { ok: false, status: res.status, message: text };
+        }
+        catch (err) {
+            return { ok: false, status: 500, message: err.message };
+        }
+    }
+    upgradeOauthToWebSession(profileName, cookies, email) {
+        const data = this.storage.load();
+        const prof = data.profiles[profileName];
+        if (!prof) {
+            throw new Error(`Profile '${profileName}' không tồn tại.`);
+        }
+        const now = Date.now();
+        prof.type = 'web_session';
+        prof.cookies = cookies.trim();
+        prof.isBlockedAntigravity = false;
+        if (email && email.trim()) {
+            prof.email = email.trim();
+        }
+        prof.updatedAt = now;
+        data.profiles[profileName] = prof;
+        this.storage.save(data);
+        return prof;
+    }
     async loginAndSave(profileName) {
         const data = this.storage.load();
         const { tokens, email } = await this.oauthHandler.authorizeInteractive();
         // Tự động dùng chính email của tài khoản Google nếu không truyền profileName
         const resolvedName = profileName && profileName.trim().length > 0 ? profileName.trim() : email;
+        // Kiểm tra ngay tài khoản có bị Google chặn CloudCode/Antigravity không
+        let isBlockedAntigravity = false;
+        if (tokens.access_token) {
+            const health = await this.checkAntigravityHealth(tokens.access_token);
+            if (!health.ok && health.status === 403) {
+                isBlockedAntigravity = true;
+            }
+        }
         const now = Date.now();
         const profile = {
             name: resolvedName,
             email,
             type: 'oauth',
             tokens,
+            isBlockedAntigravity,
             createdAt: data.profiles[resolvedName]?.createdAt || now,
             updatedAt: now
         };

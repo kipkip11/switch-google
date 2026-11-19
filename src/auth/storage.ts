@@ -21,6 +21,7 @@ export interface GoogleProfile {
   apiKey?: string;
   cookies?: string;
   type?: ProfileType;
+  isBlockedAntigravity?: boolean;
   createdAt: number;
   updatedAt: number;
 }

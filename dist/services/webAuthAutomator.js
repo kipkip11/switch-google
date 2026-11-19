@@ -202,7 +202,7 @@ async function connectCdp(wsUrl) {
  * 4. Tự động lấy email và xác thực SNlM0e token
  * 5. Tự đóng browser và trả về WebAuthResult
  */
-async function autoCaptureGeminiWebSession(timeoutMs = 180000) {
+async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
     const chromePath = findChromiumExecutable();
     if (!chromePath) {
         throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
@@ -214,13 +214,16 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000) {
     let browserProcess = null;
     let cdpClient = null;
     try {
+        const startUrl = targetEmail && targetEmail.includes('@')
+            ? `https://accounts.google.com/ServiceLogin?Email=${encodeURIComponent(targetEmail)}&continue=https://gemini.google.com/app`
+            : 'https://gemini.google.com/app';
         const launchArgs = [
             `--remote-debugging-port=${cdpPort}`,
             `--user-data-dir=${tempProfileDir}`,
             '--no-first-run',
             '--no-default-browser-check',
             '--window-size=1024,768',
-            'https://gemini.google.com/app'
+            startUrl
         ];
         browserProcess = (0, child_process_1.spawn)(chromePath, launchArgs, {
             detached: false,
@@ -319,6 +322,9 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000) {
                                     detectedEmail = m[1];
                             }
                             catch (_) { }
+                        }
+                        if (!detectedEmail && targetEmail) {
+                            detectedEmail = targetEmail;
                         }
                         if (!detectedEmail) {
                             detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;

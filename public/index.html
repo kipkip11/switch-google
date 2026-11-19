@@ -2144,6 +2144,7 @@
                           p.isDisabled ? 'state-down' : '';
 
         const statusLabel = p.isDisabled ? 'Đã ngắt cáp' :
+                            (p.isBlockedAntigravity && p.type === 'oauth') ? '⚠️ Bị Chặn Antigravity' :
                             p.linkStatus === 'banned' ? 'Banned (TOS)' :
                             p.linkStatus === 'cooldown' ? `Cooldown (${p.cooldownRemainingSeconds}s)` :
                             isLive ? '⚡ Đang phục vụ' : 'Sẵn sàng';
@@ -2172,8 +2173,16 @@
             </div>
 
             <div class="port-stats-row">
-              <span style="color: ${p.linkStatus === 'up' ? '#34d399' : p.linkStatus === 'banned' ? '#f87171' : '#fbbf24'};">${statusLabel}</span>
+              <span style="color: ${p.isDisabled ? 'var(--text-muted)' : (p.isBlockedAntigravity && p.type === 'oauth') ? '#f87171' : p.linkStatus === 'up' ? '#34d399' : p.linkStatus === 'banned' ? '#f87171' : '#fbbf24'};">${statusLabel}</span>
             </div>
+
+            ${p.isBlockedAntigravity && p.type === 'oauth' ? `
+              <div style="margin: 6px 0 2px 0;">
+                <button class="btn-action primary" style="width: 100%; padding: 4px 6px; font-size: 0.7rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); border: none; border-radius: 4px; font-weight: 700;" onclick="upgradeToWebMode('${p.profile}')" title="Kích hoạt Chrome tự động lấy Cookie để vượt chặn Antigravity">
+                  ⚡ Chuyển sang Web Mode
+                </button>
+              </div>
+            ` : ''}
 
             <div class="mini-switch-row" style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span class="mini-switch-text">${p.isDisabled ? 'Off' : 'Active'}</span>
@@ -2256,12 +2265,18 @@
               <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">
                 ${p.type.toUpperCase()} • ${formatTokens(p.totalTokens || 0)} tok
               </div>
+              ${p.isBlockedAntigravity && p.type === 'oauth' ? `
+                <div style="font-size: 0.63rem; color: #f87171; font-weight: 700; margin-top: 2px;">⚠️ Bị Chặn Antigravity</div>
+              ` : ''}
               ${healthBadgeHtml}
             </div>
 
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
               <span class="topo-badge ${isActive ? 'active' : ''}">${isDown ? 'Ngắt cáp' : (isActive ? '⚡ ACTIVE' : 'Standby')}</span>
               <div style="display: flex; gap: 4px;">
+                ${p.isBlockedAntigravity && p.type === 'oauth' ? `
+                  <button class="btn-action primary" style="padding: 2px 6px; font-size: 0.62rem; background: linear-gradient(135deg, #0ea5e9, #2563eb); font-weight: 700;" onclick="upgradeToWebMode('${p.profile}')" title="Kích hoạt Chrome tự động lấy Cookie để vượt chặn Antigravity">⚡ Web Mode</button>
+                ` : ''}
                 <button class="btn-action" style="padding: 2px 6px; font-size: 0.62rem;" onclick="runPingSingle('${p.profile}')" title="Kiểm tra kết nối thực tế tới Google">⚡ Ping</button>
                 <button class="btn-action ${isActive ? 'primary' : ''}" style="padding: 2px 6px; font-size: 0.62rem;" onclick="switchActiveProfile('${p.profile}')" title="Kích hoạt cổng này">Chọn</button>
                 <button class="btn-action danger" style="padding: 2px 6px; font-size: 0.62rem;" onclick="deleteAccount('${p.profile}')" title="Xóa tài khoản này khỏi hệ thống">🗑️</button>
@@ -3141,13 +3156,37 @@
       }
     }
 
+    async function upgradeToWebMode(profile) {
+      toast(`Đang mở Chrome để chuyển [${profile}] sang Web Mode... Vui lòng xác thực trên trình duyệt.`);
+      try {
+        const res = await fetch(`/api/profiles/${encodeURIComponent(profile)}/upgrade-web`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          toast(`✓ ${data.message || 'Đã chuyển sang Web Mode thành công!'}`);
+          fetchSwitchStatus();
+        } else {
+          const err = await res.json();
+          toast(`✗ Lỗi: ${err.error || 'Không thể chuyển đổi'}`);
+        }
+      } catch (e) {
+        toast(`✗ Lỗi kết nối: ${e.message}`);
+      }
+    }
+
     async function executeAddOAuth() {
       toast('Đang mở trình duyệt đăng nhập Google...', 5000);
       try {
         const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
         if (res.ok) {
           const data = await res.json();
-          toast(`✓ Đăng nhập thành công cổng [${data.email}]!`);
+          if (data.isBlockedAntigravity) {
+            toast(`⚠️ Tài khoản [${data.email}] bị Google chặn Antigravity! Bạn có thể bấm 'Chuyển sang Web Mode' để kích hoạt.`, 8000);
+          } else {
+            toast(`✓ Đăng nhập thành công cổng [${data.email}]!`);
+          }
           closeAddModal();
           fetchSwitchStatus();
         } else {

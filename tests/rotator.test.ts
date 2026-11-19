@@ -119,4 +119,45 @@ describe('AccountRotator', () => {
     expect(first.profile).not.toBe('acc2');
     expect(second.profile).not.toBe('acc2');
   });
+
+  test('should skip blocked antigravity oauth accounts when healthy accounts exist', async () => {
+    const data = storage.load();
+    data.profiles['blocked-oauth'] = {
+      name: 'blocked-oauth',
+      email: 'blocked@gmail.com',
+      type: 'oauth',
+      isBlockedAntigravity: true,
+      tokens: { access_token: 'tok' },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    storage.save(data);
+
+    rotator.setStrategy('round-robin');
+    const accs = [
+      (await rotator.getNextAccount()).profile,
+      (await rotator.getNextAccount()).profile,
+      (await rotator.getNextAccount()).profile
+    ];
+    expect(accs).not.toContain('blocked-oauth');
+  });
+
+  test('should upgrade blocked oauth account to web session and remove block flag', () => {
+    const data = storage.load();
+    data.profiles['blocked-oauth'] = {
+      name: 'blocked-oauth',
+      email: 'blocked@gmail.com',
+      type: 'oauth',
+      isBlockedAntigravity: true,
+      tokens: { access_token: 'tok' },
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    storage.save(data);
+
+    const upgraded = manager.upgradeOauthToWebSession('blocked-oauth', '__Secure-1PSID=xyz', 'blocked@gmail.com');
+    expect(upgraded.type).toBe('web_session');
+    expect(upgraded.cookies).toBe('__Secure-1PSID=xyz');
+    expect(upgraded.isBlockedAntigravity).toBe(false);
+  });
 });
