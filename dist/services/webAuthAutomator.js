@@ -272,19 +272,20 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
     if (!chromePath) {
         throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
     }
-    // Cấp phát cổng CDP độc lập, đảm bảo 100% không trùng với tiến trình khác
-    const cdpPort = await getFreePort();
+    // Sử dụng thư mục tạm riêng biệt, đảm bảo môi trường Chromium hoàn toàn độc lập
     const tempProfileDir = path_1.default.join(os_1.default.tmpdir(), `switch_google_cdp_${Date.now()}`);
     fs_1.default.mkdirSync(tempProfileDir, { recursive: true });
     let browserProcess = null;
     let cdpClient = null;
+    let cdpPort = 0;
     try {
         const startUrl = targetEmail && targetEmail.includes('@')
             ? `https://accounts.google.com/ServiceLogin?Email=${encodeURIComponent(targetEmail)}&continue=https://gemini.google.com/app`
             : 'https://gemini.google.com/app';
+        // Khởi chạy với --remote-debugging-port=0 (chuẩn Puppeteer/Chromium)
+        // Cấp phát cổng động an toàn trực tiếp từ Chromium, tránh triệt để lỗi WSAEADDRINUSE / TIME_WAIT trên Windows
         const launchArgs = [
-            `--remote-debugging-port=${cdpPort}`,
-            `--remote-debugging-address=127.0.0.1`,
+            '--remote-debugging-port=0',
             `--user-data-dir=${tempProfileDir}`,
             '--no-first-run',
             '--no-default-browser-check',
@@ -292,9 +293,13 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             '--window-size=1100,800',
             startUrl
         ];
+        let spawnError = null;
         browserProcess = (0, child_process_1.spawn)(chromePath, launchArgs, {
             detached: false,
             stdio: 'ignore'
+        });
+        browserProcess.on('error', (err) => {
+            spawnError = err;
         });
         if (os_1.default.platform() === 'darwin') {
             try {
@@ -303,38 +308,61 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             }
             catch (_) { }
         }
-        // Chờ CDP server sẵn sàng
+        // Chờ CDP server sẵn sàng: Đọc trực tiếp cổng và wsUrl từ file DevToolsActivePort được Chromium tạo tự động
         let wsUrl = null;
+        const activePortFile = path_1.default.join(tempProfileDir, 'DevToolsActivePort');
         const startWait = Date.now();
         while (Date.now() - startWait < 15000) {
-            try {
-                const json = await new Promise((resolve, reject) => {
-                    const req = http_1.default.get(`http://127.0.0.1:${cdpPort}/json/version`, (res) => {
-                        let data = '';
-                        res.on('data', (d) => (data += d));
-                        res.on('end', () => {
-                            try {
-                                resolve(JSON.parse(data));
-                            }
-                            catch (e) {
-                                reject(e);
-                            }
-                        });
-                    });
-                    req.on('error', reject);
-                    req.setTimeout(1000, () => req.destroy());
-                });
-                if (json && json.webSocketDebuggerUrl) {
-                    wsUrl = json.webSocketDebuggerUrl;
-                    break;
+            if (spawnError) {
+                throw new Error(`Không thể khởi động trình duyệt: ${spawnError?.message || spawnError}`);
+            }
+            // 1. Đọc file DevToolsActivePort do chính Chromium ghi ra khi bind thành công
+            if (fs_1.default.existsSync(activePortFile)) {
+                try {
+                    const content = fs_1.default.readFileSync(activePortFile, 'utf8').trim().split('\n');
+                    const portNum = parseInt(content[0], 10);
+                    const wsPath = (content[1] || '').trim();
+                    if (portNum > 0 && wsPath) {
+                        cdpPort = portNum;
+                        wsUrl = `ws://127.0.0.1:${portNum}${wsPath}`;
+                        break;
+                    }
                 }
+                catch (_) { }
             }
-            catch (_) {
-                await new Promise((r) => setTimeout(r, 400));
+            // 2. Dự phòng: Thăm dò endpoint HTTP nếu cdpPort đã được xác định
+            if (cdpPort > 0 && !wsUrl) {
+                try {
+                    const json = await new Promise((resolve, reject) => {
+                        const req = http_1.default.get(`http://127.0.0.1:${cdpPort}/json/version`, (res) => {
+                            let data = '';
+                            res.on('data', (d) => (data += d));
+                            res.on('end', () => {
+                                try {
+                                    resolve(JSON.parse(data));
+                                }
+                                catch (e) {
+                                    reject(e);
+                                }
+                            });
+                        });
+                        req.on('error', reject);
+                        req.setTimeout(800, () => req.destroy());
+                    });
+                    if (json && json.webSocketDebuggerUrl) {
+                        wsUrl = json.webSocketDebuggerUrl;
+                        break;
+                    }
+                }
+                catch (_) { }
             }
+            await new Promise((r) => setTimeout(r, 100));
         }
-        if (!wsUrl) {
-            throw new Error(`Không thể kết nối Chrome DevTools Protocol tại cổng ${cdpPort}.`);
+        if (!wsUrl || cdpPort === 0) {
+            if (browserProcess.exitCode !== null && browserProcess.exitCode !== 0) {
+                throw new Error(`Trình duyệt kết thúc bất thường với mã lỗi ${browserProcess.exitCode}. Vui lòng kiểm tra quyền hạn.`);
+            }
+            throw new Error(`Không thể kết nối Chrome DevTools Protocol (quá thời gian chờ 15s).`);
         }
         // Kết nối WebSocket CDP qua wrapper tương thích đa phiên bản
         cdpClient = await connectCdp(wsUrl);
