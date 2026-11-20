@@ -232,7 +232,17 @@ WantedBy=default.target`;
             return { success: true, message: 'Không có tiến trình ngầm nào đang chạy.' };
         }
         try {
-            process.kill(pid, 'SIGTERM');
+            if (process.platform === 'win32') {
+                try {
+                    (0, child_process_1.execSync)(`taskkill /F /PID ${pid}`, { windowsHide: true, stdio: 'ignore' });
+                }
+                catch (_) {
+                    process.kill(pid, 'SIGTERM');
+                }
+            }
+            else {
+                process.kill(pid, 'SIGTERM');
+            }
             if (fs_1.default.existsSync(this.pidFile)) {
                 fs_1.default.unlinkSync(this.pidFile);
             }
@@ -392,12 +402,52 @@ WantedBy=default.target`;
             currentVersion = pkg.version || '1.0.0';
         }
         catch (_) { }
+        // 1. Thử đọc trực tiếp từ .git folder (100% Node.js, không spawn cmd, không giật popup trên Windows)
         try {
-            currentCommit = (0, child_process_1.execSync)('git rev-parse --short HEAD', { cwd: this.appRoot, stdio: ['ignore', 'pipe', 'ignore'] })
-                .toString()
-                .trim();
+            const gitHeadPath = path_1.default.join(this.appRoot, '.git', 'HEAD');
+            if (fs_1.default.existsSync(gitHeadPath)) {
+                const headContent = fs_1.default.readFileSync(gitHeadPath, 'utf8').trim();
+                if (headContent.startsWith('ref: ')) {
+                    const refRelPath = headContent.slice(5).trim();
+                    const refPath = path_1.default.join(this.appRoot, '.git', refRelPath);
+                    if (fs_1.default.existsSync(refPath)) {
+                        currentCommit = fs_1.default.readFileSync(refPath, 'utf8').trim().slice(0, 7);
+                    }
+                    else {
+                        // Thử tìm trong .git/packed-refs
+                        const packedPath = path_1.default.join(this.appRoot, '.git', 'packed-refs');
+                        if (fs_1.default.existsSync(packedPath)) {
+                            const packed = fs_1.default.readFileSync(packedPath, 'utf8');
+                            const match = packed.split('\n').find((line) => line.endsWith(refRelPath));
+                            if (match) {
+                                currentCommit = match.split(' ')[0].trim().slice(0, 7);
+                            }
+                        }
+                    }
+                }
+                else if (headContent.length >= 7) {
+                    currentCommit = headContent.slice(0, 7);
+                }
+            }
         }
         catch (_) { }
+        // 2. Nếu chưa đọc được bằng fs, fallback execSync an toàn với windowsHide: true
+        if (currentCommit === 'unknown') {
+            try {
+                currentCommit = (0, child_process_1.execSync)('git rev-parse --short HEAD', {
+                    cwd: this.appRoot,
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                    windowsHide: true
+                })
+                    .toString()
+                    .trim();
+            }
+            catch (_) { }
+        }
+        // 3. Nếu là cài đặt từ ZIP (không có git), dùng phiên bản vX.Y.Z
+        if (currentCommit === 'unknown') {
+            currentCommit = `v${currentVersion}`;
+        }
         try {
             const commitData = await this.fetchGithubJson('/repos/kipkip11/switch-google/commits/main');
             const latestSha = commitData.sha || '';
@@ -562,11 +612,21 @@ WantedBy=default.target`;
     }
     restartDaemon(port = 1909) {
         this.stopDaemon();
-        // Chờ socket giải phóng
+        // Chờ socket giải phóng bằng pure node sleep (zero spawn, không nháy CMD)
         try {
-            (0, child_process_1.execSync)(process.platform === 'win32' ? 'timeout /t 1 >nul' : 'sleep 0.5');
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 600);
         }
-        catch (_) { }
+        catch (_) {
+            try {
+                if (process.platform === 'win32') {
+                    (0, child_process_1.execSync)('ping 127.0.0.1 -n 2 >nul', { windowsHide: true, stdio: 'ignore' });
+                }
+                else {
+                    (0, child_process_1.execSync)('sleep 0.5', { stdio: 'ignore' });
+                }
+            }
+            catch (_) { }
+        }
         return this.startDaemon(port);
     }
     performSelfUpdate() {
@@ -590,12 +650,12 @@ WantedBy=default.target`;
             }
             let output = '';
             if (fs_1.default.existsSync(path_1.default.join(this.appRoot, '.git'))) {
-                output += (0, child_process_1.execSync)('git pull origin main', { cwd: this.appRoot }).toString();
-                output += '\n' + (0, child_process_1.execSync)('npm install', { cwd: this.appRoot }).toString();
-                output += '\n' + (0, child_process_1.execSync)('npm run build', { cwd: this.appRoot }).toString();
+                output += (0, child_process_1.execSync)('git pull origin main', { cwd: this.appRoot, windowsHide: true }).toString();
+                output += '\n' + (0, child_process_1.execSync)('npm install', { cwd: this.appRoot, windowsHide: true }).toString();
+                output += '\n' + (0, child_process_1.execSync)('npm run build', { cwd: this.appRoot, windowsHide: true }).toString();
             }
             else {
-                output += (0, child_process_1.execSync)('npm install -g git+https://github.com/kipkip11/switch-google.git').toString();
+                output += (0, child_process_1.execSync)('npm install -g git+https://github.com/kipkip11/switch-google.git', { windowsHide: true }).toString();
             }
             return {
                 success: true,

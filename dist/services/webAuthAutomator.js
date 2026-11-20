@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.findChromiumExecutable = findChromiumExecutable;
 exports.connectCdp = connectCdp;
 exports.getFreePort = getFreePort;
+exports.isCdpAlive = isCdpAlive;
 exports.autoCaptureGeminiWebSession = autoCaptureGeminiWebSession;
 const http_1 = __importDefault(require("http"));
 const net_1 = __importDefault(require("net"));
@@ -61,7 +62,7 @@ function findChromiumExecutable() {
         const progFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
         const progFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
         const localAppData = process.env['LOCALAPPDATA'] || path_1.default.join(os_1.default.homedir(), 'AppData', 'Local');
-        candidates.push(path_1.default.join(progFiles, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(progFilesX86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(progFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'));
+        candidates.push(path_1.default.join(progFiles, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(progFilesX86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(localAppData, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFiles, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFilesX86, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'), path_1.default.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'));
     }
     else {
         candidates.push('/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium-browser', '/usr/bin/chromium', '/snap/bin/chromium');
@@ -244,6 +245,21 @@ async function getFreePort() {
     });
 }
 /**
+ * Kiểm tra cổng CDP của Chrome còn đang phản hồi hay không
+ */
+async function isCdpAlive(port) {
+    return new Promise((resolve) => {
+        const req = http_1.default.get(`http://127.0.0.1:${port}/json/version`, (res) => {
+            resolve(res.statusCode === 200);
+        });
+        req.on('error', () => resolve(false));
+        req.setTimeout(800, () => {
+            req.destroy();
+            resolve(false);
+        });
+    });
+}
+/**
  * Đăng nhập tự động vào Gemini Web qua Chrome CDP:
  * 1. Khởi chạy Chrome với isolate data-dir và mở cổng CDP
  * 2. Mở sẵn trang gemini.google.com để người dùng đăng nhập bằng Google
@@ -337,8 +353,16 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
         let detectedEmail = '';
         while (Date.now() - startTime < timeoutMs) {
             // 1. Kiểm tra tiến trình browser còn sống không
-            if (browserProcess.killed || browserProcess.exitCode !== null) {
+            // Trên Windows, launcher process thường tự exit với code 0 nhưng Chrome vẫn chạy ngầm qua CDP port.
+            // Chỉ coi là đã đóng nếu không còn kết nối được tới CDP port.
+            if (browserProcess.killed) {
                 throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
+            }
+            if (browserProcess.exitCode !== null) {
+                const cdpStillAlive = await isCdpAlive(cdpPort);
+                if (!cdpStillAlive) {
+                    throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
+                }
             }
             // 2. Lấy toàn bộ cookies từ Chrome CDP (Sử dụng Storage.getCookies chuẩn trên Browser Target, fallback Network.getAllCookies)
             try {
@@ -410,14 +434,39 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                             expression: `(() => {
                 try {
                   const wiz = (window && window.WIZ_global_data) || {};
-                  const html = (document.documentElement && document.documentElement.innerHTML) || (document.body && document.body.innerHTML) || "";
-                  const sn = wiz.SNlM0e || (html.match(/"SNlM0e":"(.*?)"/) || [])[1] || (html.match(/"thykhd":"(.*?)"/) || [])[1] || "";
+                  let sn = wiz.SNlM0e || "";
+                  if (!sn) {
+                    const scripts = document.querySelectorAll('script');
+                    for (const s of scripts) {
+                      const text = s.textContent || "";
+                      if (text.includes('SNlM0e') || text.includes('thykhd')) {
+                        const m = text.match(/"SNlM0e":"(.*?)"/) || text.match(/"thykhd":"(.*?)"/);
+                        if (m && m[1]) { sn = m[1]; break; }
+                      }
+                    }
+                  }
+
                   let email = "";
                   try {
-                    const m = html.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);
-                    if (m) email = m[1];
+                    const accountBtn = document.querySelector('button[aria-label*="@"], a[aria-label*="@"], [data-email], img[alt*="@"]');
+                    if (accountBtn) {
+                      const rawText = accountBtn.getAttribute('aria-label') || accountBtn.getAttribute('data-email') || accountBtn.getAttribute('alt') || '';
+                      const m = rawText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);
+                      if (m) email = m[1];
+                    }
+                    if (!email) {
+                      const scripts = document.querySelectorAll('script');
+                      for (const s of scripts) {
+                        const text = s.textContent || "";
+                        if (text.includes('@gmail.com') || text.includes('@googlemail.com')) {
+                          const m = text.match(/([a-zA-Z0-9._%+-]+@(gmail|googlemail)\\.[a-zA-Z]{2,})/i);
+                          if (m && m[1]) { email = m[1]; break; }
+                        }
+                      }
+                    }
                   } catch (_) {}
-                  return JSON.stringify({ sn, email, url: window.location.href });
+
+                  return JSON.stringify({ sn, email, url: window.location.href, docCookie: document.cookie || "" });
                 } catch (e) {
                   return JSON.stringify({ error: e.message });
                 }
@@ -431,6 +480,18 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                             }
                             if (info && info.email && !detectedEmail) {
                                 detectedEmail = info.email;
+                            }
+                            if (info && info.docCookie) {
+                                const parts = info.docCookie.split(';');
+                                for (const p of parts) {
+                                    const eq = p.indexOf('=');
+                                    if (eq > 0) {
+                                        const k = p.slice(0, eq).trim();
+                                        const v = p.slice(eq + 1).trim();
+                                        if (k && v)
+                                            detectedCookies[k] = v;
+                                    }
+                                }
                             }
                         }
                     }
@@ -448,11 +509,11 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             }
             catch (_) { }
             // 4. Kiểm tra điều kiện hoàn tất phiên (Session Completion Gate):
-            // - Đã có SID hoặc __Secure-1PSID
+            // - Đã có SID hoặc __Secure-1PSID hoặc __Secure-3PSID
             // - Đã điều hướng vào gemini.google.com
             // - Đã lấy được SNlM0e HOẶC đã có __Secure-1PSIDTS
-            const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['SID'];
-            const sidts = detectedCookies['__Secure-1PSIDTS'];
+            const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['__Secure-3PSID'] || detectedCookies['SID'];
+            const sidts = detectedCookies['__Secure-1PSIDTS'] || detectedCookies['__Secure-3PSIDTS'];
             if (sid && (isGeminiUrlActive || sidts || inPageSn)) {
                 // Chuẩn hóa chuỗi cookie
                 const cookieString = Object.entries(detectedCookies)
@@ -510,13 +571,27 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
         catch (_) { }
         try {
             if (browserProcess && !browserProcess.killed) {
+                if (process.platform === 'win32' && browserProcess.pid) {
+                    try {
+                        (0, child_process_1.execSync)(`taskkill /F /T /PID ${browserProcess.pid}`, { windowsHide: true, stdio: 'ignore' });
+                    }
+                    catch (_) { }
+                }
                 browserProcess.kill('SIGTERM');
             }
         }
         catch (_) { }
-        try {
-            fs_1.default.rmSync(tempProfileDir, { recursive: true, force: true });
+        const cleanupTempDir = () => {
+            try {
+                if (fs_1.default.existsSync(tempProfileDir)) {
+                    fs_1.default.rmSync(tempProfileDir, { recursive: true, force: true });
+                }
+            }
+            catch (_) { }
+        };
+        cleanupTempDir();
+        if (process.platform === 'win32') {
+            setTimeout(cleanupTempDir, 1500).unref();
         }
-        catch (_) { }
     }
 }

@@ -1,7 +1,7 @@
 import http from 'http';
 import net from 'net';
 import crypto from 'crypto';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -43,7 +43,12 @@ export function findChromiumExecutable(): string | null {
       path.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe'),
       path.join(progFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
       path.join(progFilesX86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-      path.join(progFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')
+      path.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      path.join(localAppData, 'CocCoc', 'Browser', 'Application', 'browser.exe'),
+      path.join(progFiles, 'CocCoc', 'Browser', 'Application', 'browser.exe'),
+      path.join(progFilesX86, 'CocCoc', 'Browser', 'Application', 'browser.exe'),
+      path.join(progFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+      path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')
     );
   } else {
     candidates.push(
@@ -232,6 +237,22 @@ export async function getFreePort(): Promise<number> {
 }
 
 /**
+ * Kiểm tra cổng CDP của Chrome còn đang phản hồi hay không
+ */
+export async function isCdpAlive(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}/json/version`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(800, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+/**
  * Đăng nhập tự động vào Gemini Web qua Chrome CDP:
  * 1. Khởi chạy Chrome với isolate data-dir và mở cổng CDP
  * 2. Mở sẵn trang gemini.google.com để người dùng đăng nhập bằng Google
@@ -333,8 +354,16 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
 
     while (Date.now() - startTime < timeoutMs) {
       // 1. Kiểm tra tiến trình browser còn sống không
-      if (browserProcess.killed || browserProcess.exitCode !== null) {
+      // Trên Windows, launcher process thường tự exit với code 0 nhưng Chrome vẫn chạy ngầm qua CDP port.
+      // Chỉ coi là đã đóng nếu không còn kết nối được tới CDP port.
+      if (browserProcess.killed) {
         throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
+      }
+      if (browserProcess.exitCode !== null) {
+        const cdpStillAlive = await isCdpAlive(cdpPort);
+        if (!cdpStillAlive) {
+          throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
+        }
       }
 
       // 2. Lấy toàn bộ cookies từ Chrome CDP (Sử dụng Storage.getCookies chuẩn trên Browser Target, fallback Network.getAllCookies)
@@ -411,14 +440,39 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
               expression: `(() => {
                 try {
                   const wiz = (window && window.WIZ_global_data) || {};
-                  const html = (document.documentElement && document.documentElement.innerHTML) || (document.body && document.body.innerHTML) || "";
-                  const sn = wiz.SNlM0e || (html.match(/"SNlM0e":"(.*?)"/) || [])[1] || (html.match(/"thykhd":"(.*?)"/) || [])[1] || "";
+                  let sn = wiz.SNlM0e || "";
+                  if (!sn) {
+                    const scripts = document.querySelectorAll('script');
+                    for (const s of scripts) {
+                      const text = s.textContent || "";
+                      if (text.includes('SNlM0e') || text.includes('thykhd')) {
+                        const m = text.match(/"SNlM0e":"(.*?)"/) || text.match(/"thykhd":"(.*?)"/);
+                        if (m && m[1]) { sn = m[1]; break; }
+                      }
+                    }
+                  }
+
                   let email = "";
                   try {
-                    const m = html.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);
-                    if (m) email = m[1];
+                    const accountBtn = document.querySelector('button[aria-label*="@"], a[aria-label*="@"], [data-email], img[alt*="@"]');
+                    if (accountBtn) {
+                      const rawText = accountBtn.getAttribute('aria-label') || accountBtn.getAttribute('data-email') || accountBtn.getAttribute('alt') || '';
+                      const m = rawText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);
+                      if (m) email = m[1];
+                    }
+                    if (!email) {
+                      const scripts = document.querySelectorAll('script');
+                      for (const s of scripts) {
+                        const text = s.textContent || "";
+                        if (text.includes('@gmail.com') || text.includes('@googlemail.com')) {
+                          const m = text.match(/([a-zA-Z0-9._%+-]+@(gmail|googlemail)\\.[a-zA-Z]{2,})/i);
+                          if (m && m[1]) { email = m[1]; break; }
+                        }
+                      }
+                    }
                   } catch (_) {}
-                  return JSON.stringify({ sn, email, url: window.location.href });
+
+                  return JSON.stringify({ sn, email, url: window.location.href, docCookie: document.cookie || "" });
                 } catch (e) {
                   return JSON.stringify({ error: e.message });
                 }
@@ -434,6 +488,17 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
               if (info && info.email && !detectedEmail) {
                 detectedEmail = info.email;
               }
+              if (info && info.docCookie) {
+                const parts = info.docCookie.split(';');
+                for (const p of parts) {
+                  const eq = p.indexOf('=');
+                  if (eq > 0) {
+                    const k = p.slice(0, eq).trim();
+                    const v = p.slice(eq + 1).trim();
+                    if (k && v) detectedCookies[k] = v;
+                  }
+                }
+              }
             }
           } catch (_) {
           } finally {
@@ -445,11 +510,11 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
       } catch (_) {}
 
       // 4. Kiểm tra điều kiện hoàn tất phiên (Session Completion Gate):
-      // - Đã có SID hoặc __Secure-1PSID
+      // - Đã có SID hoặc __Secure-1PSID hoặc __Secure-3PSID
       // - Đã điều hướng vào gemini.google.com
       // - Đã lấy được SNlM0e HOẶC đã có __Secure-1PSIDTS
-      const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['SID'];
-      const sidts = detectedCookies['__Secure-1PSIDTS'];
+      const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['__Secure-3PSID'] || detectedCookies['SID'];
+      const sidts = detectedCookies['__Secure-1PSIDTS'] || detectedCookies['__Secure-3PSIDTS'];
 
       if (sid && (isGeminiUrlActive || sidts || inPageSn)) {
         // Chuẩn hóa chuỗi cookie
@@ -510,11 +575,24 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
     } catch (_) {}
     try {
       if (browserProcess && !browserProcess.killed) {
+        if (process.platform === 'win32' && browserProcess.pid) {
+          try {
+            execSync(`taskkill /F /T /PID ${browserProcess.pid}`, { windowsHide: true, stdio: 'ignore' });
+          } catch (_) {}
+        }
         browserProcess.kill('SIGTERM');
       }
     } catch (_) {}
-    try {
-      fs.rmSync(tempProfileDir, { recursive: true, force: true });
-    } catch (_) {}
+    const cleanupTempDir = () => {
+      try {
+        if (fs.existsSync(tempProfileDir)) {
+          fs.rmSync(tempProfileDir, { recursive: true, force: true });
+        }
+      } catch (_) {}
+    };
+    cleanupTempDir();
+    if (process.platform === 'win32') {
+      setTimeout(cleanupTempDir, 1500).unref();
+    }
   }
 }
