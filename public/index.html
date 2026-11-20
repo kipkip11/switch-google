@@ -1562,6 +1562,12 @@
       <button class="nav-tab-btn" id="tab-btn-keys" onclick="navigateTab('keys')">
         🔑 4. Virtual API Keys <span class="tab-badge" id="badge-key-count">1</span>
       </button>
+      <button class="nav-tab-btn" id="tab-btn-playground" onclick="navigateTab('playground')">
+        🧪 5. AI Playground & Models
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-integration" onclick="navigateTab('integration')">
+        🚀 6. Tích Hợp 1-Click
+      </button>
     </div>
 
     <!-- ======================================================== -->
@@ -2122,6 +2128,254 @@
         </div>
       </div>
     </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 5: AI PLAYGROUND & MODEL CATALOG                      -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-playground">
+      <div class="chart-container-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+              <span>🧪 AI Model Catalog & Live Playground</span>
+            </h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Thử nghiệm và đo lường trực tiếp các model cao cấp của Google Cloud Code & Antigravity qua giao thức Native Protocol.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">🟢 Gateway Active: http://localhost:1909</span>
+          </div>
+        </div>
+
+        <!-- Model Selection Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px;">
+          <div class="model-select-card active" onclick="selectPlaygroundModel('gemini-3.8-flash', this)" style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-weight: 800; color: #38bdf8; font-size: 0.88rem;">⚡ gemini-3.8-flash</span>
+              <span style="font-size: 0.65rem; background: #0284c7; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700;">FAST</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0;">Tốc độ cực nhanh, phản hồi < 0.5s, chuyên dụng cho chat & code tức thì.</p>
+          </div>
+
+          <div class="model-select-card" onclick="selectPlaygroundModel('gemini-4-argon', this)" style="background: rgba(16, 23, 38, 0.75); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-weight: 800; color: #f59e0b; font-size: 0.88rem;">👑 gemini-4-argon</span>
+              <span style="font-size: 0.65rem; background: #d97706; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700;">REASONING</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0;">Model tư duy sâu cao cấp nhất của Google, suy luận toán & kiến trúc phần mềm.</p>
+          </div>
+
+          <div class="model-select-card" onclick="selectPlaygroundModel('claude-3-7-sonnet', this)" style="background: rgba(16, 23, 38, 0.75); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-weight: 800; color: #c084fc; font-size: 0.88rem;">🧠 claude-3-7-sonnet</span>
+              <span style="font-size: 0.65rem; background: #9333ea; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700;">HYBRID</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0;">Claude 3.7 Sonnet với khả năng lập trình đỉnh cao và tư duy logic đa bước.</p>
+          </div>
+
+          <div class="model-select-card" onclick="selectPlaygroundModel('gemini-2.5-pro', this)" style="background: rgba(16, 23, 38, 0.75); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-weight: 800; color: #10b981; font-size: 0.88rem;">💎 gemini-2.5-pro</span>
+              <span style="font-size: 0.65rem; background: #059669; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ACCURACY</span>
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0;">Chính xác, ngữ cảnh mở rộng triệu tokens, thích hợp phân tích dự án lớn.</p>
+          </div>
+        </div>
+
+        <!-- Playground Console Box -->
+        <div style="display: grid; grid-template-columns: 1fr; gap: 14px;">
+          <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);">Prompt Gửi Lên:</span>
+                <span id="playground-active-model-tag" style="font-family: var(--font-mono); font-size: 0.75rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 2px 8px; border-radius: 6px;">gemini-3.8-flash</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="playground-stream-toggle" checked />
+                  <span>Stream SSE Realtime</span>
+                </label>
+                <button class="btn-action primary" id="btn-run-playground" onclick="executePlaygroundPrompt()" style="padding: 6px 18px; font-size: 0.85rem;">
+                  🚀 Gửi Prompt Test
+                </button>
+              </div>
+            </div>
+
+            <textarea id="playground-input" class="input-box" style="height: 80px; resize: vertical; font-family: var(--font-sans); font-size: 0.88rem;" placeholder="Nhập câu hỏi test hoặc prompt lập trình (vd: Viết thuật toán quicksort bằng TypeScript)...">Hãy viết một hàm TypeScript ngắn gọn tính Fibonacci với memoization và giải thích độ phức tạp.</textarea>
+
+            <!-- Metrics bar -->
+            <div id="playground-metrics" style="display: none; align-items: center; gap: 14px; font-size: 0.75rem; font-family: var(--font-mono); color: var(--text-muted); background: rgba(255, 255, 255, 0.03); padding: 6px 12px; border-radius: 6px;">
+              <span>⏱️ Latency: <b id="m-latency" style="color: #38bdf8;">0ms</b></span>
+              <span>⚡ Tokens: <b id="m-tokens" style="color: #10b981;">0</b></span>
+              <span>🔄 Status: <b id="m-status" style="color: #34d399;">Ready</b></span>
+            </div>
+
+            <!-- Output Screen -->
+            <div style="position: relative;">
+              <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                <span>Phản hồi từ AI Gateway (Stream Response):</span>
+                <span id="playground-loading-indicator" style="display: none; color: #38bdf8;">Đang sinh nội dung...</span>
+              </div>
+              <div id="playground-output" style="min-height: 140px; max-height: 420px; overflow-y: auto; background: #040711; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; color: #e2e8f0;">Nhấn "Gửi Prompt Test" để kiểm tra trực tiếp độ mượt và tốc độ phản hồi của model qua Switch Google.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 6: 1-CLICK QUICK INTEGRATION                          -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-integration">
+      <!-- Banner Antigravity Direct Link (Fast-Pipe MITM) -->
+      <div style="background: linear-gradient(135deg, rgba(24, 24, 37, 0.95), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(168, 85, 247, 0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.4rem;">⚡</span>
+              <h3 style="font-size: 1.15rem; font-weight: 800; color: #fff; margin: 0;">
+                Antigravity IDE Direct Link (Zero-Translation Fast-Pipe)
+              </h3>
+              <span id="mitm-status-badge" class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; font-weight: 700;">CHƯA BẬT</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 6px 0 0 0;">
+              Kết nối trực tiếp thanh chat mặc định của Antigravity IDE vào Switch Google: độ trễ < 5ms, 100% Native Headers, tuyệt đối không bị Google quét.
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btn-toggle-mitm" class="btn-action primary" onclick="toggleMitmDirectLink()" style="padding: 10px 18px; font-weight: 700; background: #a855f7; border-color: #a855f7;">
+              ⚡ Kích Hoạt Antigravity Direct Link
+            </button>
+          </div>
+        </div>
+
+        <div id="mitm-setup-guide" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.76rem; color: #94a3b8; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>1. Lệnh tin cậy chứng chỉ Root CA nội bộ (chạy 1 lần):</span>
+            <button class="btn-action" style="padding: 2px 8px; font-size: 0.7rem;" onclick="copyTrustCommand()">📋 Copy Lệnh SSL</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>2. Lệnh chuyển hướng Hosts sang Switch Google:</span>
+            <button class="btn-action" style="padding: 2px 8px; font-size: 0.7rem;" onclick="copyHostsCommand()">📋 Copy Lệnh Hosts</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container-card">
+        <div style="margin-bottom: 16px;">
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: #a855f7; display: flex; align-items: center; gap: 8px;">
+            <span>🚀 Tích Hợp 1-Click Vào Mọi Môi Trường Lập Trình</span>
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            Sao chép cấu hình chuẩn chỉ với 1 cú nhấp để kết nối Cursor, VS Code (Roo-Code/Cline), coding assistant, hoặc API scripts.
+          </p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+          <!-- Card 0: Antigravity IDE -->
+          <div style="background: rgba(10, 16, 29, 0.85); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.1);">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem; color: #38bdf8;">🪐 Antigravity IDE (Pair Programming)</span>
+                <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;">Khuyên Dùng</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                Cấu hình Switch Google làm Custom OpenAI Gateway để dùng trọn vẹn toàn bộ dàn tài khoản xoay tua mượt mà:
+              </p>
+              <pre style="background: #040711; padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: #38bdf8; overflow-x: auto;">
+Provider:  OpenAI Compatible
+Base URL:  http://localhost:1909/v1
+API Key:   sk-switch-local
+Models:    gemini-3.8-flash, gemini-4-argon, claude-3-7-sonnet</pre>
+            </div>
+            <button class="btn-action primary" onclick="copySnippet('http://localhost:1909/v1')" style="width: 100%;">
+              📋 1-Click Copy Base URL Cho Antigravity IDE
+            </button>
+          </div>
+
+          <!-- Card 1: Cursor IDE -->
+          <div style="background: rgba(10, 16, 29, 0.8); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem; color: #38bdf8;">🖱️ Cursor IDE</span>
+                <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">OpenAI Compatible</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                Vào Cursor Settings > Models > Thêm OpenAI API Key và đổi Base URL thành cổng Switch Google:
+              </p>
+              <pre style="background: #040711; padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; overflow-x: auto;">
+Base URL: http://localhost:1909/v1
+API Key:  sk-switch-local (hoặc key tùy ý)
+Models:   gemini-3.8-flash, claude-3-7-sonnet</pre>
+            </div>
+            <button class="btn-action" onclick="copySnippet('http://localhost:1909/v1')" style="width: 100%;">
+              📋 Copy Base URL Cho Cursor
+            </button>
+          </div>
+
+          <!-- Card 2: Roo-Code & Cline -->
+          <div style="background: rgba(10, 16, 29, 0.8); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem; color: #10b981;">⚡ Roo-Code / Cline (VS Code)</span>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">Agent Extension</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                Chọn Provider "OpenAI Compatible", nhập thông số để tận dụng full model xoay tua:
+              </p>
+              <pre style="background: #040711; padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; overflow-x: auto;">
+API Base URL: http://localhost:1909/v1
+API Key:      sk-switch-local
+Model ID:     gemini-4-argon</pre>
+            </div>
+            <button class="btn-action" onclick="copySnippet('http://localhost:1909/v1')" style="width: 100%;">
+              📋 Copy Cấu Hình Cho Roo-Code
+            </button>
+          </div>
+
+          <!-- Card 3: coding assistant CLI -->
+          <div style="background: rgba(10, 16, 29, 0.8); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem; color: #c084fc;">🤖 coding assistant</span>
+                <span class="badge" style="background: rgba(192, 132, 252, 0.15); color: #c084fc;">Autonomous Agent</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                Chạy với model thông qua Switch Google proxy an toàn không sợ quét:
+              </p>
+              <pre style="background: #040711; padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; overflow-x: auto;">
+export OPENAI_BASE_URL="http://localhost:1909/v1"
+export OPENAI_API_KEY="sk-switch-local"
+coding-agent --model gemini-3.8-flash</pre>
+            </div>
+            <button class="btn-action" onclick="copySnippet('export OPENAI_BASE_URL=&quot;http://localhost:1909/v1&quot; &amp;&amp; export OPENAI_API_KEY=&quot;sk-switch-local&quot;')" style="width: 100%;">
+              📋 Copy Lệnh Shell Cho coding assistant
+            </button>
+          </div>
+
+          <!-- Card 4: cURL Terminal Test -->
+          <div style="background: rgba(10, 16, 29, 0.8); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem; color: #f59e0b;">💻 cURL CLI Quick Test</span>
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">Standard HTTP</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                Gửi request kiểm tra tức thì từ Terminal của bạn:
+              </p>
+              <pre style="background: #040711; padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; overflow-x: auto;">
+curl http://localhost:1909/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gemini-3.8-flash","messages":[{"role":"user","content":"Hello"}]}'</pre>
+            </div>
+            <button class="btn-action" onclick="copySnippet('curl http://localhost:1909/v1/chat/completions -H &quot;Content-Type: application/json&quot; -d \'{\&quot;model\&quot;:\&quot;gemini-3.8-flash\&quot;,\&quot;messages\&quot;:[{\&quot;role\&quot;:\&quot;user\&quot;,\&quot;content\&quot;:\&quot;Hello\&quot;}]}\'')" style="width: 100%;">
+              📋 Copy Lệnh cURL Test
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- ======================================================== -->
@@ -2331,6 +2585,207 @@
       });
     }
 
+    function copySnippet(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast('✓ Đã sao chép cấu hình vào Clipboard!');
+      }).catch(() => {
+        toast('✓ Đã chọn cấu hình!');
+      });
+    }
+
+    // --- ANTIGRAVITY DIRECT LINK (MITM) CONTROLS ---
+    let mitmInfo = { running: false, dnsEnabled: false, trustCommand: '', enableDnsCommand: '' };
+
+    async function checkMitmStatus() {
+      try {
+        const res = await fetch('/api/mitm/status');
+        if (res.ok) {
+          mitmInfo = await res.json();
+          const badge = document.getElementById('mitm-status-badge');
+          const btn = document.getElementById('btn-toggle-mitm');
+          if (badge && btn) {
+            if (mitmInfo.running) {
+              badge.textContent = 'ĐANG HOẠT ĐỘNG (FAST-PIPE)';
+              badge.style.background = 'rgba(34, 197, 94, 0.2)';
+              badge.style.color = '#22c55e';
+              btn.textContent = '⏹ Dừng Antigravity Direct Link';
+              btn.style.background = '#ef4444';
+              btn.style.borderColor = '#ef4444';
+            } else {
+              badge.textContent = 'CHƯA BẬT';
+              badge.style.background = 'rgba(239, 68, 68, 0.2)';
+              badge.style.color = '#ef4444';
+              btn.textContent = '⚡ Kích Hoạt Antigravity Direct Link';
+              btn.style.background = '#a855f7';
+              btn.style.borderColor = '#a855f7';
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function toggleMitmDirectLink() {
+      const willEnable = !mitmInfo.running;
+      try {
+        const res = await fetch('/api/mitm/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: willEnable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast(willEnable ? '⚡ Đã kích hoạt Antigravity Direct Link!' : '⏹ Đã dừng Direct Link');
+          checkMitmStatus();
+        } else {
+          toast('⚠️ Lỗi: ' + (data.error || 'Không thể đổi trạng thái Direct Link'));
+        }
+      } catch (err) {
+        toast('⚠️ Lỗi kết nối máy chủ');
+      }
+    }
+
+    function copyTrustCommand() {
+      if (mitmInfo.trustCommand) {
+        copySnippet(mitmInfo.trustCommand);
+      } else {
+        copySnippet('sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.config/switch-google/mitm/rootCA.crt');
+      }
+    }
+
+    function copyHostsCommand() {
+      if (mitmInfo.enableDnsCommand) {
+        copySnippet(mitmInfo.enableDnsCommand);
+      } else {
+        copySnippet('echo "127.0.0.1 daily-cloudcode-pa.googleapis.com" | sudo tee -a /etc/hosts');
+      }
+    }
+
+    // --- PLAYGROUND CONTROLS ---
+    let selectedPlaygroundModel = 'gemini-3.8-flash';
+    function selectPlaygroundModel(modelId, cardEl) {
+      selectedPlaygroundModel = modelId;
+      document.querySelectorAll('.model-select-card').forEach(c => {
+        c.style.background = 'rgba(16, 23, 38, 0.75)';
+        c.style.borderColor = 'var(--border-subtle)';
+      });
+      if (cardEl) {
+        cardEl.style.background = 'rgba(14, 165, 233, 0.08)';
+        cardEl.style.borderColor = 'rgba(14, 165, 233, 0.4)';
+      }
+      const tag = document.getElementById('playground-active-model-tag');
+      if (tag) tag.textContent = modelId;
+    }
+
+    async function executePlaygroundPrompt() {
+      const inputEl = document.getElementById('playground-input');
+      const outputEl = document.getElementById('playground-output');
+      const btn = document.getElementById('btn-run-playground');
+      const metricsBar = document.getElementById('playground-metrics');
+      const latencyEl = document.getElementById('m-latency');
+      const tokensEl = document.getElementById('m-tokens');
+      const statusEl = document.getElementById('m-status');
+      const loader = document.getElementById('playground-loading-indicator');
+      const isStream = document.getElementById('playground-stream-toggle').checked;
+
+      const prompt = inputEl.value.trim();
+      if (!prompt) {
+        toast('⚠️ Vui lòng nhập prompt cần test!');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      if (loader) loader.style.display = 'inline';
+      outputEl.textContent = '';
+      if (metricsBar) metricsBar.style.display = 'flex';
+      if (statusEl) statusEl.textContent = 'Đang gọi gateway...';
+
+      const startTime = Date.now();
+      let firstTokenTime = 0;
+      let tokenEstimate = 0;
+
+      try {
+        const response = await fetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer sk-switch-local'
+          },
+          body: JSON.stringify({
+            model: selectedPlaygroundModel,
+            messages: [{ role: 'user', content: prompt }],
+            stream: isStream
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
+
+        if (statusEl) statusEl.textContent = 'Đang nhận phản hồi...';
+
+        if (!isStream) {
+          const data = await response.json();
+          const latency = Date.now() - startTime;
+          const content = data.choices?.[0]?.message?.content || JSON.stringify(data, null, 2);
+          outputEl.textContent = content;
+          if (latencyEl) latencyEl.textContent = `${latency}ms`;
+          if (tokensEl) tokensEl.textContent = `${data.usage?.total_tokens || Math.round(content.length / 4)}`;
+          if (statusEl) statusEl.textContent = 'Hoàn tất ✓';
+        } else {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let fullText = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            if (!firstTokenTime) {
+              firstTokenTime = Date.now() - startTime;
+              if (latencyEl) latencyEl.textContent = `${firstTokenTime}ms (TTFT)`;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const clean = line.trim();
+              if (clean.startsWith('data: ')) {
+                const dataStr = clean.slice(6);
+                if (dataStr === '[DONE]') break;
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  const delta = parsed.choices?.[0]?.delta?.content || '';
+                  if (delta) {
+                    fullText += delta;
+                    tokenEstimate += 1;
+                    outputEl.textContent = fullText;
+                    outputEl.scrollTop = outputEl.scrollHeight;
+                    if (tokensEl) tokensEl.textContent = `~${tokenEstimate} tok`;
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          const totalTime = Date.now() - startTime;
+          if (latencyEl) latencyEl.textContent = `${totalTime}ms (Total)`;
+          if (statusEl) statusEl.textContent = 'Hoàn tất ✓';
+        }
+      } catch (err) {
+        outputEl.textContent = `❌ Lỗi khi gửi request: ${err.message}`;
+        if (statusEl) statusEl.textContent = 'Thất bại ✗';
+      } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        if (loader) loader.style.display = 'none';
+      }
+    }
+
     // --- TAB NAVIGATION ---
     let currentActiveTab = 'switch';
     function navigateTab(tabKey) {
@@ -2353,6 +2808,7 @@
       }
       if (tabKey === 'keys') fetchApiKeys();
       if (tabKey === 'combos') fetchCombos();
+      if (tabKey === 'integration') checkMitmStatus();
     }
 
     // --- MODAL CONTROLS ---

@@ -7,6 +7,9 @@ import { createOpenAiRouter } from './openaiAdapter';
 import { usageTracker } from '../usage/tracker';
 import { DaemonManager } from '../services/daemon';
 import { autoCaptureGeminiWebSession } from '../services/webAuthAutomator';
+import { MitmServer } from '../mitm/mitmServer';
+import { CertManager } from '../mitm/certManager';
+import { DnsManager } from '../mitm/dnsManager';
 
 export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   const app = express();
@@ -137,7 +140,8 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
+                'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
                 'Authorization': `Bearer ${creds.access_token}`
               },
               body: JSON.stringify({
@@ -154,7 +158,8 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                  'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
+                  'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
                   'Authorization': `Bearer ${creds.access_token}`
                 },
                 body: JSON.stringify({
@@ -883,6 +888,48 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       const { enabled } = req.body;
       const result = enabled ? daemon.enableAutoStart(port) : daemon.disableAutoStart();
       res.json({ ...result, autoStartEnabled: daemon.isAutoStartEnabled() });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ----------------------------------------------------
+  // Antigravity Direct Link (Transparent Fast-Pipe MITM)
+  // ----------------------------------------------------
+  const mitm = MitmServer.getInstance(manager, rotator);
+  DnsManager.registerExitRollback();
+
+  app.get('/api/mitm/status', (req: Request, res: Response) => {
+    try {
+      const status = mitm.getStatus();
+      const dnsEnabled = DnsManager.isEnabled();
+      res.json({
+        running: status.running,
+        port: status.port,
+        certTrusted: status.certTrusted,
+        dnsEnabled,
+        trustCommand: CertManager.getTrustCommand(),
+        enableDnsCommand: DnsManager.getEnableCommand(),
+        disableDnsCommand: DnsManager.getDisableCommand()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/mitm/toggle', async (req: Request, res: Response) => {
+    try {
+      const { enabled, port: mitmPort = 443 } = req.body;
+      if (enabled) {
+        await mitm.start(mitmPort);
+      } else {
+        await mitm.stop();
+      }
+      res.json({
+        success: true,
+        status: mitm.getStatus(),
+        dnsEnabled: DnsManager.isEnabled()
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

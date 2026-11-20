@@ -53,10 +53,14 @@ const geminiWebClient_1 = require("./geminiWebClient");
  * Tìm đường dẫn thực thi của trình duyệt nhân Chromium trên hệ thống
  */
 function findChromiumExecutable() {
+    // 1. Kiểm tra biến môi trường CHROME_PATH trước tiên
+    if (process.env.CHROME_PATH && fs_1.default.existsSync(process.env.CHROME_PATH)) {
+        return process.env.CHROME_PATH;
+    }
     const platform = os_1.default.platform();
     const candidates = [];
     if (platform === 'darwin') {
-        candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', path_1.default.join(os_1.default.homedir(), 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'), '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser');
+        candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', path_1.default.join(os_1.default.homedir(), 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'), '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', path_1.default.join(os_1.default.homedir(), 'Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'), '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser', path_1.default.join(os_1.default.homedir(), 'Applications/Brave Browser.app/Contents/MacOS/Brave Browser'), '/Applications/Chromium.app/Contents/MacOS/Chromium', path_1.default.join(os_1.default.homedir(), 'Applications/Chromium.app/Contents/MacOS/Chromium'), '/Applications/Arc.app/Contents/MacOS/Arc');
     }
     else if (platform === 'win32') {
         const progFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
@@ -65,12 +69,27 @@ function findChromiumExecutable() {
         candidates.push(path_1.default.join(progFiles, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe'), path_1.default.join(progFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(progFilesX86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path_1.default.join(localAppData, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFiles, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFilesX86, 'CocCoc', 'Browser', 'Application', 'browser.exe'), path_1.default.join(progFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'), path_1.default.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'));
     }
     else {
-        candidates.push('/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium-browser', '/usr/bin/chromium', '/snap/bin/chromium');
+        // Linux / Ubuntu / Debian / Fedora / Arch
+        candidates.push('/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium', '/usr/bin/microsoft-edge', '/usr/bin/microsoft-edge-stable', '/usr/bin/brave-browser', '/var/lib/flatpak/exports/bin/org.chromium.Chromium', '/var/lib/flatpak/exports/bin/com.google.Chrome');
     }
     for (const candidate of candidates) {
         if (fs_1.default.existsSync(candidate)) {
             return candidate;
         }
+    }
+    // 2. Fallback quét qua PATH thông qua which/where
+    const binNames = platform === 'win32'
+        ? ['chrome.exe', 'msedge.exe', 'brave.exe']
+        : ['google-chrome-stable', 'google-chrome', 'chromium-browser', 'chromium', 'microsoft-edge-stable', 'microsoft-edge', 'brave-browser'];
+    for (const bin of binNames) {
+        try {
+            const lookupCmd = platform === 'win32' ? `where ${bin}` : `which ${bin}`;
+            const foundPath = (0, child_process_1.execSync)(lookupCmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split(/\r?\n/)[0];
+            if (foundPath && fs_1.default.existsSync(foundPath)) {
+                return foundPath;
+            }
+        }
+        catch (_) { }
     }
     return null;
 }
@@ -272,8 +291,19 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
     if (!chromePath) {
         throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
     }
-    // Sử dụng thư mục tạm riêng biệt, đảm bảo môi trường Chromium hoàn toàn độc lập
-    const tempProfileDir = path_1.default.join(os_1.default.tmpdir(), `switch_google_cdp_${Date.now()}`);
+    // Sử dụng thư mục tạm riêng biệt, đảm bảo môi trường Chromium hoàn toàn độc lập.
+    // Trên Linux/Ubuntu, nếu dùng Snap chromium hoặc container, lưu trong $HOME/.config/switch-google/cdp_temp
+    // để tránh bị AppArmor/Snap chặn truy cập /tmp
+    let baseTmpDir = os_1.default.tmpdir();
+    if (os_1.default.platform() === 'linux') {
+        const snapHomeDir = path_1.default.join(os_1.default.homedir(), '.config', 'switch-google', 'cdp_temp');
+        try {
+            fs_1.default.mkdirSync(snapHomeDir, { recursive: true });
+            baseTmpDir = snapHomeDir;
+        }
+        catch (_) { }
+    }
+    const tempProfileDir = path_1.default.join(baseTmpDir, `switch_google_cdp_${Date.now()}`);
     fs_1.default.mkdirSync(tempProfileDir, { recursive: true });
     let browserProcess = null;
     let cdpClient = null;
@@ -289,6 +319,12 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             `--user-data-dir=${tempProfileDir}`,
             '--no-first-run',
             '--no-default-browser-check',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gpu',
+            '--disable-background-networking',
+            '--disable-features=Translate,OptimizationHints',
             '--window-position=120,80',
             '--window-size=1100,800',
             startUrl
@@ -605,7 +641,21 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                     }
                     catch (_) { }
                 }
-                browserProcess.kill('SIGTERM');
+                else if (browserProcess.pid) {
+                    try {
+                        // Kill process tree trên Unix/Linux/macOS nếu process còn sót
+                        process.kill(-browserProcess.pid, 'SIGTERM');
+                    }
+                    catch (_) {
+                        try {
+                            browserProcess.kill('SIGTERM');
+                        }
+                        catch (_) { }
+                    }
+                }
+                else {
+                    browserProcess.kill('SIGTERM');
+                }
             }
         }
         catch (_) { }

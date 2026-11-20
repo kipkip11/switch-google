@@ -135,7 +135,8 @@ class ProfileManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'User-Agent': 'antigravity/hub/2.24.0 darwin/arm64',
+                    'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
+                    'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
                     'Authorization': `Bearer ${accessToken}`
                 },
                 body: JSON.stringify({

@@ -22,6 +22,11 @@ export interface CdpClient {
  * Tìm đường dẫn thực thi của trình duyệt nhân Chromium trên hệ thống
  */
 export function findChromiumExecutable(): string | null {
+  // 1. Kiểm tra biến môi trường CHROME_PATH trước tiên
+  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
+    return process.env.CHROME_PATH;
+  }
+
   const platform = os.platform();
   const candidates: string[] = [];
 
@@ -30,7 +35,12 @@ export function findChromiumExecutable(): string | null {
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       path.join(os.homedir(), 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-      '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+      path.join(os.homedir(), 'Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
+      '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+      path.join(os.homedir(), 'Applications/Brave Browser.app/Contents/MacOS/Brave Browser'),
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      path.join(os.homedir(), 'Applications/Chromium.app/Contents/MacOS/Chromium'),
+      '/Applications/Arc.app/Contents/MacOS/Arc'
     );
   } else if (platform === 'win32') {
     const progFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
@@ -51,12 +61,18 @@ export function findChromiumExecutable(): string | null {
       path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')
     );
   } else {
+    // Linux / Ubuntu / Debian / Fedora / Arch
     candidates.push(
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
-      '/usr/bin/chromium-browser',
       '/usr/bin/chromium',
-      '/snap/bin/chromium'
+      '/usr/bin/chromium-browser',
+      '/snap/bin/chromium',
+      '/usr/bin/microsoft-edge',
+      '/usr/bin/microsoft-edge-stable',
+      '/usr/bin/brave-browser',
+      '/var/lib/flatpak/exports/bin/org.chromium.Chromium',
+      '/var/lib/flatpak/exports/bin/com.google.Chrome'
     );
   }
 
@@ -65,6 +81,22 @@ export function findChromiumExecutable(): string | null {
       return candidate;
     }
   }
+
+  // 2. Fallback quét qua PATH thông qua which/where
+  const binNames = platform === 'win32'
+    ? ['chrome.exe', 'msedge.exe', 'brave.exe']
+    : ['google-chrome-stable', 'google-chrome', 'chromium-browser', 'chromium', 'microsoft-edge-stable', 'microsoft-edge', 'brave-browser'];
+
+  for (const bin of binNames) {
+    try {
+      const lookupCmd = platform === 'win32' ? `where ${bin}` : `which ${bin}`;
+      const foundPath = execSync(lookupCmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split(/\r?\n/)[0];
+      if (foundPath && fs.existsSync(foundPath)) {
+        return foundPath;
+      }
+    } catch (_) {}
+  }
+
   return null;
 }
 
@@ -266,8 +298,18 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
     throw new Error('Không tìm thấy Google Chrome hoặc trình duyệt Chromium trên máy để tự động đăng nhập.');
   }
 
-  // Sử dụng thư mục tạm riêng biệt, đảm bảo môi trường Chromium hoàn toàn độc lập
-  const tempProfileDir = path.join(os.tmpdir(), `switch_google_cdp_${Date.now()}`);
+  // Sử dụng thư mục tạm riêng biệt, đảm bảo môi trường Chromium hoàn toàn độc lập.
+  // Trên Linux/Ubuntu, nếu dùng Snap chromium hoặc container, lưu trong $HOME/.config/switch-google/cdp_temp
+  // để tránh bị AppArmor/Snap chặn truy cập /tmp
+  let baseTmpDir = os.tmpdir();
+  if (os.platform() === 'linux') {
+    const snapHomeDir = path.join(os.homedir(), '.config', 'switch-google', 'cdp_temp');
+    try {
+      fs.mkdirSync(snapHomeDir, { recursive: true });
+      baseTmpDir = snapHomeDir;
+    } catch (_) {}
+  }
+  const tempProfileDir = path.join(baseTmpDir, `switch_google_cdp_${Date.now()}`);
   fs.mkdirSync(tempProfileDir, { recursive: true });
 
   let browserProcess: ChildProcess | null = null;
@@ -286,6 +328,12 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
       `--user-data-dir=${tempProfileDir}`,
       '--no-first-run',
       '--no-default-browser-check',
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-features=Translate,OptimizationHints',
       '--window-position=120,80',
       '--window-size=1100,800',
       startUrl
@@ -611,8 +659,18 @@ export async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmai
           try {
             execSync(`taskkill /F /T /PID ${browserProcess.pid}`, { windowsHide: true, stdio: 'ignore' });
           } catch (_) {}
+        } else if (browserProcess.pid) {
+          try {
+            // Kill process tree trên Unix/Linux/macOS nếu process còn sót
+            process.kill(-browserProcess.pid, 'SIGTERM');
+          } catch (_) {
+            try {
+              browserProcess.kill('SIGTERM');
+            } catch (_) {}
+          }
+        } else {
+          browserProcess.kill('SIGTERM');
         }
-        browserProcess.kill('SIGTERM');
       }
     } catch (_) {}
     const cleanupTempDir = () => {

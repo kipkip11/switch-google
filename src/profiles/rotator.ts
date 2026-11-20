@@ -225,11 +225,23 @@ export class AccountRotator {
     return s;
   }
 
-  public markCooldown(profileName: string, durationSeconds = 60): void {
+  public markCooldown(profileName: string, durationSeconds?: number): void {
     const s = this.getOrCreateStats(profileName);
     s.failedRequests += 1;
-    s.cooldownUntil = Date.now() + durationSeconds * 1000;
-    console.warn(`[Rotator] Tài khoản [${profileName}] cooldown trong ${durationSeconds}s.`);
+
+    // Exponential Backoff with Full Jitter để triệt tiêu hiện tượng Thundering Herd
+    // Base: 20s, nhân đôi theo số lần fail liên tiếp (tối đa 300s), cộng thêm jitter ngẫu nhiên 5-15s
+    let actualDuration = durationSeconds;
+    if (!actualDuration) {
+      const baseDelay = 20;
+      const failCount = Math.min(s.failedRequests, 4);
+      const backoff = baseDelay * Math.pow(1.5, failCount);
+      const jitter = Math.floor(Math.random() * 10) + 5;
+      actualDuration = Math.min(300, Math.round(backoff + jitter));
+    }
+
+    s.cooldownUntil = Date.now() + actualDuration * 1000;
+    console.warn(`[Rotator] Tài khoản [${profileName}] cooldown (Jitter Backoff) trong ${actualDuration}s.`);
     // Reset turn nếu tài khoản bị cooldown
     if (this.currentTurnAccount === profileName) {
       this.currentTurnAccount = null;
