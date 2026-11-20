@@ -294,6 +294,50 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+      min-width: 0;
+    }
+
+    .chassis-tools-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chassis-port-counter {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(15, 23, 42, 0.75);
+      padding: 4px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      letter-spacing: 0.04em;
+    }
+    .chassis-tool-btn {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    .chassis-tool-btn:hover {
+      background: rgba(14, 165, 233, 0.25);
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
     }
 
     .chassis-top-strip {
@@ -384,10 +428,10 @@
     /* Switch Ports Matrix */
     .ports-rack-matrix {
       display: flex;
-      gap: 14px;
+      gap: 12px;
       align-items: stretch;
-      overflow-x: auto;
-      padding-bottom: 6px;
+      min-width: 0;
+      position: relative;
     }
 
     /* SFP+ Uplink Slot (Input from Hermes/Cursor) */
@@ -463,12 +507,93 @@
       font-weight: 800;
     }
 
-    /* RJ45 Ports Flex Container */
+    /* RJ45 Scrollable Bay Wrapper & Hardware Navigation Controls */
+    .rj45-bay-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      background: rgba(6, 10, 18, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 6px 8px;
+    }
+
+    .rack-scroll-btn {
+      width: 26px;
+      height: 70px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      user-select: none;
+    }
+    .rack-scroll-btn:hover:not(.disabled) {
+      background: rgba(14, 165, 233, 0.3);
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
+      transform: scale(1.06);
+    }
+    .rack-scroll-btn.disabled,
+    .rack-scroll-btn:disabled {
+      opacity: 0.18;
+      cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.06);
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
+    /* RJ45 Ports Deck (Single-Row / Dual-Row Horizontal Scroll) */
     .rj45-ports-deck {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex: 1;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      padding: 4px 2px 10px 2px;
+      -webkit-overflow-scrolling: touch;
+      min-width: 0;
+    }
+
+    /* Dual-Tier Matrix: 24/48 Port Cisco-Style Staggered Grid */
+    .rj45-ports-deck.dual-tier-matrix {
+      display: grid;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: column;
+      grid-auto-columns: 165px;
+      gap: 10px;
+    }
+
+    /* Custom Hardware Cyberpunk Horizontal Scrollbar */
+    .rj45-ports-deck::-webkit-scrollbar {
+      height: 7px;
+    }
+    .rj45-ports-deck::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.7);
+      border-radius: 4px;
+      margin: 0 10px;
+    }
+    .rj45-ports-deck::-webkit-scrollbar-thumb {
+      background: linear-gradient(90deg, #0284c7, #38bdf8);
+      border-radius: 4px;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+    .rj45-ports-deck::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(90deg, #38bdf8, #7dd3fc);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
     }
 
     .rj45-unit-card {
@@ -479,9 +604,10 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      min-width: 136px;
-      flex: 1;
-      max-width: 195px;
+      width: 165px;
+      min-width: 165px;
+      max-width: 165px;
+      flex-shrink: 0;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
     }
@@ -1491,6 +1617,22 @@
               <div class="chassis-model-tag">10GbE / L3 BALANCED ROUTING</div>
             </div>
 
+            <!-- Chassis Control & Quick Actions Toolbar -->
+            <div class="chassis-tools-bar">
+              <div class="chassis-port-counter" id="chassis-port-counter" title="Tổng số cổng vật lý đã kết nối">
+                <span class="micro-led pwr-green" style="width: 6px; height: 6px;"></span>
+                <span id="port-counter-text">0 CỔNG</span>
+              </div>
+
+              <button class="chassis-tool-btn" id="btn-jump-active" onclick="jumpToActivePort()" title="Cuộn ngay tới cổng đang phục vụ request AI">
+                🎯 Đến Cổng Đang Chạy
+              </button>
+
+              <button class="chassis-tool-btn" id="btn-toggle-rack-view" onclick="toggleRackViewMode()" title="Chuyển chế độ: 1 Hàng Ngang (1U Slim) hoặc 2 Hàng So Le (Dual-Tier Matrix)">
+                <span id="rack-view-mode-icon">≡</span> <span id="rack-view-mode-label">1 Hàng</span>
+              </button>
+            </div>
+
             <div class="chassis-sys-leds">
               <div class="sys-led">
                 <div class="micro-led pwr-green"></div>
@@ -1512,7 +1654,7 @@
 
           <!-- Switch Ports Bay -->
           <div class="ports-rack-matrix">
-            <!-- SFP+ Fiber Uplink (Client Input) -->
+            <!-- SFP+ Fiber Uplink (Client Input - Fixed Left) -->
             <div class="sfp-uplink-bay">
               <div class="sfp-label">SFP+ UPLINK</div>
               <div class="sfp-hardware-cage">
@@ -1525,9 +1667,16 @@
               </div>
             </div>
 
-            <!-- RJ45 Physical Ports Container -->
-            <div class="rj45-ports-deck" id="rack-ports-container">
-              <div style="color: var(--text-muted); padding: 14px; font-size: 0.85rem;">Đang đồng bộ trạng thái cổng Switch...</div>
+            <!-- Scrollable RJ45 Ports Bay with Hardware Navigation Controls -->
+            <div class="rj45-bay-wrapper">
+              <button class="rack-scroll-btn prev disabled" id="rack-scroll-left" onclick="scrollRackPorts(-1)" title="Cuộn sang trái (hoặc lăn chuột)">◀</button>
+
+              <!-- RJ45 Physical Ports Container -->
+              <div class="rj45-ports-deck" id="rack-ports-container">
+                <div style="color: var(--text-muted); padding: 14px; font-size: 0.85rem;">Đang đồng bộ trạng thái cổng Switch...</div>
+              </div>
+
+              <button class="rack-scroll-btn next" id="rack-scroll-right" onclick="scrollRackPorts(1)" title="Cuộn sang phải (hoặc lăn chuột)">▶</button>
             </div>
           </div>
         </div>
@@ -2336,6 +2485,9 @@
       const container = document.getElementById('rack-ports-container');
       if (!ports || ports.length === 0) {
         container.innerHTML = `<div style="color: var(--text-muted); padding: 14px;">Chưa có cổng mạng nào được kết nối.</div>`;
+        const counterEl = document.getElementById('port-counter-text');
+        if (counterEl) counterEl.innerText = '0 CỔNG';
+        updateRackScrollButtons();
         return;
       }
 
@@ -2411,6 +2563,110 @@
           </div>
         `;
       }).join('');
+
+      // Update port counter badge
+      const counterEl = document.getElementById('port-counter-text');
+      if (counterEl) {
+        const upCount = ports.filter(p => !p.isDisabled && p.linkStatus === 'up').length;
+        counterEl.innerText = `${ports.length} CỔNG (${upCount} ACTIVE)`;
+      }
+
+      // Sync scroll button states
+      setTimeout(updateRackScrollButtons, 50);
+    }
+
+    // --- 1U RACK SWITCH CONTROLS & DUAL-TIER MATRIX ---
+    let currentRackViewMode = localStorage.getItem('switch_ports_view_mode') || 'single';
+
+    function applyRackViewMode() {
+      const deck = document.getElementById('rack-ports-container');
+      const label = document.getElementById('rack-view-mode-label');
+      const icon = document.getElementById('rack-view-mode-icon');
+      if (!deck) return;
+
+      if (currentRackViewMode === 'dual') {
+        deck.classList.add('dual-tier-matrix');
+        if (label) label.innerText = '2 Hàng (Dual)';
+        if (icon) icon.innerText = '☵';
+      } else {
+        deck.classList.remove('dual-tier-matrix');
+        if (label) label.innerText = '1 Hàng (1U)';
+        if (icon) icon.innerText = '≡';
+      }
+      setTimeout(updateRackScrollButtons, 60);
+    }
+
+    function toggleRackViewMode() {
+      currentRackViewMode = currentRackViewMode === 'single' ? 'dual' : 'single';
+      localStorage.setItem('switch_ports_view_mode', currentRackViewMode);
+      applyRackViewMode();
+    }
+
+    function scrollRackPorts(direction) {
+      const deck = document.getElementById('rack-ports-container');
+      if (!deck) return;
+      const scrollAmount = Math.max(340, Math.floor(deck.clientWidth * 0.75));
+      deck.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+      setTimeout(updateRackScrollButtons, 350);
+    }
+
+    function updateRackScrollButtons() {
+      const deck = document.getElementById('rack-ports-container');
+      const btnLeft = document.getElementById('rack-scroll-left');
+      const btnRight = document.getElementById('rack-scroll-right');
+      if (!deck || !btnLeft || !btnRight) return;
+
+      const maxScroll = deck.scrollWidth - deck.clientWidth;
+      if (maxScroll <= 4) {
+        btnLeft.classList.add('disabled');
+        btnRight.classList.add('disabled');
+      } else {
+        if (deck.scrollLeft <= 5) {
+          btnLeft.classList.add('disabled');
+        } else {
+          btnLeft.classList.remove('disabled');
+        }
+
+        if (deck.scrollLeft >= maxScroll - 5) {
+          btnRight.classList.add('disabled');
+        } else {
+          btnRight.classList.remove('disabled');
+        }
+      }
+    }
+
+    function jumpToActivePort() {
+      const deck = document.getElementById('rack-ports-container');
+      if (!deck) return;
+      const liveCard = deck.querySelector('.rj45-unit-card.serving-live');
+      if (liveCard) {
+        liveCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      } else {
+        const firstActive = deck.querySelector('.rj45-unit-card:not(.state-down)');
+        if (firstActive) {
+          firstActive.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }
+      setTimeout(updateRackScrollButtons, 350);
+    }
+
+    function initRackScrollEvents() {
+      const deck = document.getElementById('rack-ports-container');
+      if (!deck) return;
+
+      deck.addEventListener('scroll', updateRackScrollButtons, { passive: true });
+
+      deck.addEventListener('wheel', (e) => {
+        // Intercept standard mouse wheel and smoothly scroll rack horizontally
+        if (e.deltaY !== 0 && e.deltaX === 0) {
+          e.preventDefault();
+          deck.scrollLeft += e.deltaY;
+          updateRackScrollButtons();
+        }
+      }, { passive: false });
+
+      window.addEventListener('resize', updateRackScrollButtons, { passive: true });
+      applyRackViewMode();
     }
 
     // --- NEURAL AI TOPOLOGY RENDERER (REAL HEALTH & ROUTING) ---
@@ -3921,6 +4177,7 @@
     }
 
     // Initial Sync & Realtime Polling
+    initRackScrollEvents();
     fetchSwitchStatus();
     fetchAuditLogs();
     setInterval(fetchSwitchStatus, 2500);
