@@ -322,8 +322,15 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
         }
         // Kết nối WebSocket CDP qua wrapper tương thích đa phiên bản
         cdpClient = await connectCdp(wsUrl);
-        // Bật Network & Storage
-        await cdpClient.send('Network.enable');
+        // Bật Network & Storage nếu hỗ trợ
+        try {
+            await cdpClient.send('Storage.enable');
+        }
+        catch (_) { }
+        try {
+            await cdpClient.send('Network.enable');
+        }
+        catch (_) { }
         // Polling lấy Cookie của gemini.google.com & google.com
         const startTime = Date.now();
         let detectedCookies = {};
@@ -333,20 +340,33 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
             if (browserProcess.killed || browserProcess.exitCode !== null) {
                 throw new Error('Người dùng đã đóng cửa sổ trình duyệt trước khi hoàn tất đăng nhập.');
             }
-            // 2. Lấy toàn bộ cookies từ Chrome CDP
+            // 2. Lấy toàn bộ cookies từ Chrome CDP (Sử dụng Storage.getCookies chuẩn trên Browser Target, fallback Network.getAllCookies)
             try {
-                const cookiesRes = await cdpClient.send('Network.getAllCookies');
-                if (cookiesRes && Array.isArray(cookiesRes.cookies)) {
-                    for (const c of cookiesRes.cookies) {
+                const storageRes = await cdpClient.send('Storage.getCookies');
+                if (storageRes && Array.isArray(storageRes.cookies)) {
+                    for (const c of storageRes.cookies) {
                         if (c.domain && (c.domain.includes('google.com') || c.domain.includes('google'))) {
                             detectedCookies[c.name] = c.value;
                         }
                     }
                 }
             }
-            catch (_) { }
-            // 3. Phương thức 1 (Tối ưu nhất): Đọc trực tiếp SNlM0e token và Email từ tab Gemini đang mở
+            catch (_) {
+                try {
+                    const cookiesRes = await cdpClient.send('Network.getAllCookies');
+                    if (cookiesRes && Array.isArray(cookiesRes.cookies)) {
+                        for (const c of cookiesRes.cookies) {
+                            if (c.domain && (c.domain.includes('google.com') || c.domain.includes('google'))) {
+                                detectedCookies[c.name] = c.value;
+                            }
+                        }
+                    }
+                }
+                catch (_) { }
+            }
+            // 3. Phương thức 1 (Tối ưu nhất): Đọc trực tiếp SNlM0e token, Email và Cookie từ tab Gemini đang mở
             let inPageSn = '';
+            let isGeminiUrlActive = false;
             try {
                 const pageTargets = await new Promise((resTargets) => {
                     const req = http_1.default.get(`http://127.0.0.1:${cdpPort}/json/list`, (res) => {
@@ -365,18 +385,36 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                     req.setTimeout(800, () => req.destroy());
                 });
                 const geminiTab = pageTargets.find((t) => t.type === 'page' && t.url && t.url.includes('gemini.google.com'));
+                if (geminiTab) {
+                    isGeminiUrlActive = true;
+                }
                 if (geminiTab && geminiTab.webSocketDebuggerUrl) {
                     let pageCdp = null;
                     try {
                         pageCdp = await connectCdp(geminiTab.webSocketDebuggerUrl);
+                        // Bổ sung đọc cookies từ Page Target để dự phòng tối đa
+                        try {
+                            const pageCookies = await pageCdp.send('Network.getCookies', {
+                                urls: ['https://gemini.google.com', 'https://accounts.google.com', 'https://google.com']
+                            });
+                            if (pageCookies && Array.isArray(pageCookies.cookies)) {
+                                for (const c of pageCookies.cookies) {
+                                    if (c.domain && (c.domain.includes('google.com') || c.domain.includes('google'))) {
+                                        detectedCookies[c.name] = c.value;
+                                    }
+                                }
+                            }
+                        }
+                        catch (_) { }
                         const evalRes = await pageCdp.send('Runtime.evaluate', {
                             expression: `(() => {
                 try {
-                  const wiz = window.WIZ_global_data || {};
-                  const sn = wiz.SNlM0e || (document.body.innerHTML.match(/"SNlM0e":"(.*?)"/) || [])[1] || (document.body.innerHTML.match(/"thykhd":"(.*?)"/) || [])[1] || "";
+                  const wiz = (window && window.WIZ_global_data) || {};
+                  const html = (document.documentElement && document.documentElement.innerHTML) || (document.body && document.body.innerHTML) || "";
+                  const sn = wiz.SNlM0e || (html.match(/"SNlM0e":"(.*?)"/) || [])[1] || (html.match(/"thykhd":"(.*?)"/) || [])[1] || "";
                   let email = "";
                   try {
-                    const m = document.body.innerHTML.match(/([a-zA-Z0-9._%+-]+@gmail\\.com)/i);
+                    const m = html.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/i);
                     if (m) email = m[1];
                   } catch (_) {}
                   return JSON.stringify({ sn, email, url: window.location.href });
@@ -409,9 +447,13 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                 }
             }
             catch (_) { }
-            // 4. Kiểm tra có cookie phiên cốt lõi chưa
+            // 4. Kiểm tra điều kiện hoàn tất phiên (Session Completion Gate):
+            // - Đã có SID hoặc __Secure-1PSID
+            // - Đã điều hướng vào gemini.google.com
+            // - Đã lấy được SNlM0e HOẶC đã có __Secure-1PSIDTS
             const sid = detectedCookies['__Secure-1PSID'] || detectedCookies['SID'];
-            if (sid) {
+            const sidts = detectedCookies['__Secure-1PSIDTS'];
+            if (sid && (isGeminiUrlActive || sidts || inPageSn)) {
                 // Chuẩn hóa chuỗi cookie
                 const cookieString = Object.entries(detectedCookies)
                     .map(([k, v]) => `${k}=${v}`)
@@ -424,33 +466,36 @@ async function autoCaptureGeminiWebSession(timeoutMs = 180000, targetEmail) {
                     }
                     catch (_) { }
                 }
-                // Lấy email thông qua trang account Google nếu chưa có
-                if (!detectedEmail) {
-                    try {
-                        const targets = await cdpClient.send('Target.getTargets');
-                        if (targets && Array.isArray(targets.targetInfos)) {
-                            const geminiTarget = targets.targetInfos.find((t) => t.url && t.url.includes('google.com'));
-                            if (geminiTarget && geminiTarget.title) {
-                                const emailMatch = geminiTarget.title.match(/([a-zA-Z0-9._%+-]+@gmail\.com)/i);
-                                if (emailMatch) {
-                                    detectedEmail = emailMatch[1];
+                // Nếu đã có SNlM0e hoặc có cả SIDTS, hoặc đã ở trên trang gemini.google.com
+                if (finalSnlm0e || sidts || isGeminiUrlActive) {
+                    // Lấy email thông qua trang account Google nếu chưa có
+                    if (!detectedEmail) {
+                        try {
+                            const targets = await cdpClient.send('Target.getTargets');
+                            if (targets && Array.isArray(targets.targetInfos)) {
+                                const geminiTarget = targets.targetInfos.find((t) => t.url && t.url.includes('google.com'));
+                                if (geminiTarget && geminiTarget.title) {
+                                    const emailMatch = geminiTarget.title.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+                                    if (emailMatch) {
+                                        detectedEmail = emailMatch[1];
+                                    }
                                 }
                             }
                         }
+                        catch (_) { }
                     }
-                    catch (_) { }
+                    if (!detectedEmail && targetEmail) {
+                        detectedEmail = targetEmail;
+                    }
+                    if (!detectedEmail) {
+                        detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
+                    }
+                    return {
+                        email: detectedEmail,
+                        cookies: cookieString,
+                        snlm0e: finalSnlm0e || ''
+                    };
                 }
-                if (!detectedEmail && targetEmail) {
-                    detectedEmail = targetEmail;
-                }
-                if (!detectedEmail) {
-                    detectedEmail = `gemini-web-${Date.now().toString(36)}@gmail.com`;
-                }
-                return {
-                    email: detectedEmail,
-                    cookies: cookieString,
-                    snlm0e: finalSnlm0e || ''
-                };
             }
             await new Promise((r) => setTimeout(r, 1000));
         }

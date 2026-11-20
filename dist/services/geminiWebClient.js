@@ -1,25 +1,22 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeCookieString = normalizeCookieString;
+exports.getSapisidHash = getSapisidHash;
+exports.getSNlM0eToken = getSNlM0eToken;
+exports.parseGeminiWebResponse = parseGeminiWebResponse;
+exports.generateContentGeminiWeb = generateContentGeminiWeb;
+const https_1 = __importDefault(require("https"));
+const crypto_1 = __importDefault(require("crypto"));
 /**
  * Driver giao tiếp trực tiếp với Gemini Web (gemini.google.com)
  * Hoàn toàn chạy thông qua hệ thống Switch Google (luân phiên tài khoản, failover, OpenAI proxy)
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeCookieString = normalizeCookieString;
-exports.getSNlM0eToken = getSNlM0eToken;
-exports.parseGeminiWebResponse = parseGeminiWebResponse;
-exports.generateContentGeminiWeb = generateContentGeminiWeb;
-const GEMINI_APP_URL = 'https://gemini.google.com/app';
-const GEMINI_STREAM_URL = 'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const MODEL_HEADERS = {
-    'gemini-3.1-pro': '[1,null,null,null,"9d8ca3786ebdfbea",null,null,0,[4]]',
-    'gemini-2.5-pro': '[1,null,null,null,"4af6c7f5da75d65d",null,null,0,[4]]',
-    'gemini-2.5-flash': '[1,null,null,null,"9ec249fc9ad08861",null,null,0,[4]]',
-    'gemini-1.5-pro': '[1,null,null,null,"4af6c7f5da75d65d",null,null,0,[4]]',
-    'gemini-1.5-flash': '[1,null,null,null,"9ec249fc9ad08861",null,null,0,[4]]',
-};
-// Cache lưu SNlM0e token theo cookie để không phải fetch lại liên tục
-const snlm0eCache = new Map();
+// Cache lưu SNlM0e & cfb2h token theo cookie
+const sessionCache = new Map();
 /**
  * Chuẩn hóa chuỗi cookie thành header chuẩn
  */
@@ -33,15 +30,62 @@ function normalizeCookieString(rawCookie) {
         .join('; ');
 }
 /**
- * Trích xuất SNlM0e (token chống CSRF của Gemini Web)
+ * Tạo chữ ký xác thực SAPISIDHASH theo chuẩn Google Web Authentication
+ */
+function getSapisidHash(cookie) {
+    const match = cookie.match(/(?:^|;\s*)(?:__Secure-1PAPISID|__Secure-3PAPISID|SAPISID)=([^;]+)/);
+    if (!match)
+        return null;
+    const sapisid = match[1];
+    const timestamp = Math.floor(Date.now() / 1000);
+    const hash = crypto_1.default.createHash('sha1').update(`${timestamp} ${sapisid} https://gemini.google.com`).digest('hex');
+    return `SAPISIDHASH ${timestamp}_${hash}`;
+}
+/**
+ * Thực hiện HTTPS request với maxHeaderSize mở rộng (64KB) chống lỗi UND_ERR_HEADERS_OVERFLOW
+ */
+function requestWithLargeHeader(options, postData) {
+    return new Promise((resolve, reject) => {
+        const opts = {
+            ...options,
+            maxHeaderSize: 64 * 1024
+        };
+        const req = https_1.default.request(opts, (res) => {
+            let body = '';
+            res.on('data', (chunk) => {
+                body += chunk;
+            });
+            res.on('end', () => {
+                resolve({
+                    statusCode: res.statusCode || 200,
+                    headers: res.headers,
+                    body
+                });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(60000, () => {
+            req.destroy(new Error('Request to Gemini Web timed out (60s)'));
+        });
+        if (postData) {
+            req.write(postData);
+        }
+        req.end();
+    });
+}
+/**
+ * Trích xuất SNlM0e (token chống CSRF của Gemini Web) và build version (bl)
  */
 async function getSNlM0eToken(cookie) {
     const normalized = normalizeCookieString(cookie);
-    const cached = snlm0eCache.get(normalized);
+    const cached = sessionCache.get(normalized);
     if (cached && cached.expiry > Date.now()) {
-        return cached.token;
+        return cached.snlm0e;
     }
-    const res = await fetch(GEMINI_APP_URL, {
+    const res = await requestWithLargeHeader({
+        hostname: 'gemini.google.com',
+        port: 443,
+        path: '/app',
         method: 'GET',
         headers: {
             'User-Agent': USER_AGENT,
@@ -50,82 +94,98 @@ async function getSNlM0eToken(cookie) {
             'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8'
         }
     });
-    if (!res.ok) {
-        throw new Error(`Không thể kết nối Gemini Web (HTTP ${res.status}). Vui lòng kiểm tra lại Cookie.`);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw new Error(`Không thể kết nối Gemini Web (HTTP ${res.statusCode}). Vui lòng kiểm tra lại Cookie.`);
     }
-    const html = await res.text();
+    const html = res.body;
     const match = html.match(/"SNlM0e":"(.*?)"/) || html.match(/"thykhd":"(.*?)"/);
+    const blMatch = html.match(/"cfb2h":"(.*?)"/);
+    const bl = (blMatch && blMatch[1]) || 'boq_gemini-web-uiserver_20261118.14_p0';
     if (match && match[1]) {
-        const token = match[1];
+        const snlm0e = match[1];
         // Cache trong 1 giờ
-        snlm0eCache.set(normalized, { token, expiry: Date.now() + 3600 * 1000 });
-        return token;
+        sessionCache.set(normalized, { snlm0e, bl, expiry: Date.now() + 3600 * 1000 });
+        return snlm0e;
     }
     throw new Error('Không trích xuất được SNlM0e token. Cookie có thể đã hết hạn hoặc không hợp lệ.');
 }
 /**
- * Đóng gói payload f.req theo chuẩn Google Batchexecute
+ * Đóng gói payload f.req theo chuẩn Google StreamGenerate (102 slots mảng RPC)
  */
-function buildFReqPayload(prompt, conversationId = '') {
-    const reqData = [
-        [prompt, 0, null, null, null, null, 0],
-        ['en'],
-        [conversationId, '', '', null, null, []],
-        null,
-        null,
-        null,
-        [1],
-        0,
-        [],
-        [],
-        null,
-        null,
-        null,
-        null,
-        []
-    ];
-    return JSON.stringify([null, JSON.stringify(reqData)]);
+function buildFReqPayload(prompt, model) {
+    const inner = Array(102).fill(null);
+    inner[0] = [prompt, 0, null, null, null, null, 0];
+    inner[1] = ['vi'];
+    inner[2] = ['', '', '', null, null, null, null, null, null, ''];
+    inner[6] = [0];
+    inner[7] = 1;
+    inner[10] = 1;
+    inner[11] = 0;
+    // Think mode: 4 cho fast/flash, 0 cho thinking/pro
+    const isPro = model.includes('pro') || model.includes('opus') || model.includes('argon');
+    inner[17] = [[isPro ? 0 : 4]];
+    inner[30] = [4];
+    inner[41] = [2];
+    inner[59] = crypto_1.default.randomUUID();
+    inner[68] = 1;
+    inner[79] = isPro ? 2 : 1; // 1: Flash, 2: Pro
+    return JSON.stringify([null, JSON.stringify(inner)]);
 }
 /**
- * Trích xuất text trả lời từ response chunk của Gemini Web
+ * Trích xuất text trả lời từ response chunk của Gemini Web Batchexecute RPC
  */
 function parseGeminiWebResponse(rawText) {
-    const lines = rawText.split('\n');
-    let fullAnswer = '';
-    for (const line of lines) {
-        if (!line.startsWith('[') && !line.includes('wrb.fr'))
-            continue;
+    let cleanText = rawText.replace(/^\)]\}\x27\s*/, '');
+    let lastAnswer = '';
+    // Trích xuất các khối wrb.fr
+    const wrbMatches = cleanText.matchAll(/\[\["wrb\.fr",null,"(.*?)(?<!\\)"/gs);
+    for (const m of wrbMatches) {
         try {
-            const parsed = JSON.parse(line.trim());
-            if (Array.isArray(parsed) && parsed[0]?.[2]) {
-                const inner = JSON.parse(parsed[0][2]);
-                if (Array.isArray(inner) && inner[4]?.[0]?.[1]?.[0]) {
-                    fullAnswer = inner[4][0][1][0];
+            const unescaped = JSON.parse(`"${m[1]}"`);
+            const inner = JSON.parse(unescaped);
+            if (inner && Array.isArray(inner[4]) && inner[4][0] && Array.isArray(inner[4][0][1])) {
+                const txt = inner[4][0][1][0];
+                if (txt && typeof txt === 'string') {
+                    lastAnswer = txt;
                 }
             }
         }
         catch (_) { }
     }
-    if (fullAnswer)
-        return fullAnswer;
-    // Fallback regex trích xuất text
-    const match = rawText.match(/\["rc_[^"]+",\["([^"]+)"/);
-    if (match && match[1]) {
-        return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    if (lastAnswer)
+        return lastAnswer;
+    // Fallback 1: Trích xuất qua mã khối rc_
+    const rcMatch = cleanText.match(/\["rc_[^"]+",\["([^"]+)"/);
+    if (rcMatch && rcMatch[1]) {
+        return rcMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
     }
-    // Regex tìm đoạn trả lời lớn nhất
-    const textMatches = [...rawText.matchAll(/"([A-Za-z0-9\s\p{P}\p{L}]{20,})"/gu)];
-    if (textMatches.length > 0) {
-        let longest = '';
-        for (const m of textMatches) {
-            if (m[1].length > longest.length && !m[1].includes('BardChatUi') && !m[1].includes('http')) {
-                longest = m[1];
+    // Fallback 2: Duyệt từng dòng JSON
+    const lines = cleanText.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.includes('wrb.fr'))
+            continue;
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                for (const item of parsed) {
+                    if (Array.isArray(item) && item[0] === 'wrb.fr' && typeof item[2] === 'string') {
+                        const inner = JSON.parse(item[2]);
+                        if (inner && Array.isArray(inner[4]) && inner[4][0] && Array.isArray(inner[4][0][1])) {
+                            const text = inner[4][0][1][0];
+                            if (text && typeof text === 'string') {
+                                lastAnswer = text;
+                            }
+                        }
+                    }
+                }
             }
         }
-        if (longest)
-            return longest.replace(/\\n/g, '\n');
+        catch (_) { }
     }
-    return rawText.length > 300 ? rawText.slice(0, 300) : rawText;
+    if (lastAnswer)
+        return lastAnswer;
+    return cleanText.length > 300 ? cleanText.slice(0, 300) : cleanText;
 }
 /**
  * Gửi prompt tới Gemini Web qua Session Cookie
@@ -133,31 +193,40 @@ function parseGeminiWebResponse(rawText) {
 async function generateContentGeminiWeb(cookies, prompt, model = 'gemini-2.5-flash') {
     const normalized = normalizeCookieString(cookies);
     const token = await getSNlM0eToken(normalized);
-    const fReq = buildFReqPayload(prompt);
+    const cached = sessionCache.get(normalized);
+    const bl = cached?.bl || 'boq_gemini-web-uiserver_20261118.14_p0';
+    const fReq = buildFReqPayload(prompt, model);
     const params = new URLSearchParams();
     params.set('at', token);
     params.set('f.req', fReq);
-    const modelHeader = MODEL_HEADERS[model] || MODEL_HEADERS['gemini-2.5-flash'];
-    const res = await fetch(GEMINI_STREAM_URL, {
+    const postData = params.toString();
+    const reqId = Math.floor(Math.random() * 90000) + 10000;
+    const path = `/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=${encodeURIComponent(bl)}&hl=vi&_reqid=${reqId}&rt=c`;
+    const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'Host': 'gemini.google.com',
+        'Origin': 'https://gemini.google.com',
+        'Referer': 'https://gemini.google.com/',
+        'User-Agent': USER_AGENT,
+        'Cookie': normalized,
+        'x-same-domain': '1',
+        'Content-Length': String(Buffer.byteLength(postData))
+    };
+    const authHeader = getSapisidHash(normalized);
+    if (authHeader) {
+        headers['Authorization'] = authHeader;
+    }
+    const res = await requestWithLargeHeader({
+        hostname: 'gemini.google.com',
+        port: 443,
+        path,
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-            'Host': 'gemini.google.com',
-            'Origin': 'https://gemini.google.com',
-            'Referer': 'https://gemini.google.com/',
-            'User-Agent': USER_AGENT,
-            'Cookie': normalized,
-            'x-same-domain': '1',
-            'x-goog-ext-525001261-jspb': modelHeader
-        },
-        body: params.toString()
-    });
-    if (!res.ok) {
-        const errText = await res.text();
-        const err = new Error(`Gemini Web HTTP ${res.status}: ${errText.slice(0, 150)}`);
-        err.status = res.status;
+        headers
+    }, postData);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+        const err = new Error(`Gemini Web HTTP ${res.statusCode}: ${res.body.slice(0, 150)}`);
+        err.status = res.statusCode;
         throw err;
     }
-    const rawText = await res.text();
-    return parseGeminiWebResponse(rawText);
+    return parseGeminiWebResponse(res.body);
 }

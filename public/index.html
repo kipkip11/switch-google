@@ -803,14 +803,43 @@
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       color: var(--text-main);
-      padding: 10px 14px;
-      font-size: 0.88rem;
+      padding: 0 12px;
+      height: 36px;
+      box-sizing: border-box;
+      font-size: 0.84rem;
       outline: none;
       transition: all 0.2s;
     }
     .input-box:focus {
       border-color: var(--primary);
       box-shadow: 0 0 8px var(--primary-glow);
+    }
+    select.input-box {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+    select.input-box option, select.input-box optgroup {
+      background: #0b111e;
+      color: #f1f5f9;
+      padding: 6px 10px;
+    }
+    select.input-box optgroup {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .input-box.input-sm {
+      height: 30px;
+      padding: 0 8px;
+      font-size: 0.76rem;
+    }
+    select.input-box.input-sm {
+      padding-right: 22px;
+      background-position: right 6px center;
     }
 
     /* Common Buttons */
@@ -821,17 +850,26 @@
       font-family: inherit;
       font-size: 0.82rem;
       font-weight: 600;
-      padding: 7px 14px;
+      padding: 0 14px;
+      height: 36px;
+      box-sizing: border-box;
       border-radius: 8px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       transition: all 0.2s;
+      white-space: nowrap;
     }
     .btn-action:hover {
       background: rgba(255, 255, 255, 0.1);
       color: white;
+    }
+    .btn-action.btn-sm {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 0.74rem;
     }
     .btn-action.primary {
       background: #0284c7;
@@ -843,6 +881,40 @@
       background: rgba(239, 68, 68, 0.15);
       border-color: rgba(239, 68, 68, 0.3);
       color: #f87171;
+    }
+
+    /* Interactive Model Chips */
+    .model-toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 4px 10px;
+      font-size: 0.76rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+    .model-toggle-chip:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+    .model-toggle-chip.active {
+      background: rgba(168, 85, 247, 0.22);
+      border-color: #a855f7;
+      color: #f3e8ff;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
+    }
+    .model-toggle-chip.active::before {
+      content: '✓ ';
+      color: #38bdf8;
+      font-weight: 800;
     }
 
     /* ======================================================== */
@@ -1791,91 +1863,111 @@
     <!-- ======================================================== -->
     <div class="view-pane" id="pane-combos">
       <div class="chart-container-card">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
           <div>
-            <h3 style="font-size: 1.05rem; font-weight: 700; color: #c084fc;">🧩 Tạo Combo Model Thông Minh (Antigravity Pro Suite)</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-              Mở khóa toàn bộ model cao cấp: Claude 3.7 Sonnet, Gemini 3.8 Flash & Pro, GPT-4o, DeepSeek R1.
+            <h3 style="font-size: 1.05rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 8px;">
+              <span>🧩 Quản Lý & Tạo Model Combo</span>
+            </h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+              Tạo chuỗi fallback hoặc cân bằng tải luân phiên giữa các model cao cấp (Claude, Gemini, GPT, DeepSeek).
             </p>
           </div>
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button class="btn-action" onclick="applySmartPreset('smart-pro')">👑 Preset: Smart Coder</button>
-            <button class="btn-action" onclick="applySmartPreset('fast-pro')">⚡ Preset: Pro Fast</button>
-            <button class="btn-action" onclick="applySmartPreset('claude')">🧠 Preset: Claude Chain</button>
+            <button class="btn-action btn-sm" onclick="applySmartPreset('smart-pro')">👑 Preset: Smart Coder</button>
+            <button class="btn-action btn-sm" onclick="applySmartPreset('fast-pro')">⚡ Preset: Pro Fast</button>
+            <button class="btn-action btn-sm" onclick="applySmartPreset('claude')">🧠 Preset: Claude Chain</button>
           </div>
         </div>
 
-        <div style="background: rgba(8, 13, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <input type="text" id="combo-title" class="input-box" style="flex: 1; min-width: 200px;" placeholder="Tên Combo (vd: AI, pro-coder)..." />
-            <select id="combo-mode" class="input-box" style="max-width: 250px;">
-              <option value="fallback">Chiến lược: Fallback (Ưu tiên tuần tự)</option>
-              <option value="round-robin">Chiến lược: Round-Robin (Luân phiên)</option>
-            </select>
+        <!-- Compact Combo Creation Box -->
+        <div style="background: rgba(8, 13, 24, 0.75); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <!-- Balanced Input Row -->
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div style="flex: 1.8; min-width: 180px;">
+              <input type="text" id="combo-title" class="input-box" placeholder="Tên Combo mới (vd: AI, pro-coder)..." />
+            </div>
+            <div style="flex: 1.2; min-width: 190px;">
+              <select id="combo-mode" class="input-box">
+                <option value="fallback">Chiến lược: Fallback (Ưu tiên tuần tự)</option>
+                <option value="round-robin">Chiến lược: Round-Robin (Luân phiên)</option>
+              </select>
+            </div>
+            <button class="btn-action primary" onclick="submitCreateCombo()" style="flex: 0 0 auto;">
+              ➕ Lưu Model Combo
+            </button>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div>
-              <div style="font-size: 0.75rem; font-weight: 700; color: #c084fc; margin-bottom: 4px; text-transform: uppercase;">
-                🧠 Anthropic Claude (Pro)
-              </div>
-              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="claude-3-7-sonnet" class="combo-box" checked /> claude-3-7-sonnet
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="claude-3-7-sonnet-thinking" class="combo-box" /> claude-3-7-thinking
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="claude-3-5-sonnet" class="combo-box" /> claude-3-5-sonnet
-                </label>
-              </div>
+          <!-- Compact Model Selection Chips Grid -->
+          <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+              Chọn Model vào Combo (Nhấp để bật / tắt):
             </div>
 
-            <div>
-              <div style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; margin-bottom: 4px; text-transform: uppercase;">
-                💎 Google Gemini (Pro & Flash)
-              </div>
-              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="gemini-3.8-flash" class="combo-box" checked /> gemini-3.8-flash (Siêu Tốc)
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="gemini-3.8-pro" class="combo-box" checked /> gemini-3.8-pro
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="gemini-2.5-pro" class="combo-box" /> gemini-2.5-pro
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="gemini-2.5-flash" class="combo-box" /> gemini-2.5-flash
-                </label>
-              </div>
+            <!-- Group 1: Gemini -->
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; min-width: 120px;">💎 Google Gemini:</span>
+              <span class="model-toggle-chip active" onclick="toggleModelChip(this)">
+                <span>gemini-3.8-flash</span>
+                <input type="checkbox" value="gemini-3.8-flash" class="combo-box" checked style="display:none;" />
+              </span>
+              <span class="model-toggle-chip active" onclick="toggleModelChip(this)">
+                <span>gemini-3.8-pro</span>
+                <input type="checkbox" value="gemini-3.8-pro" class="combo-box" checked style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>gemini-2.5-pro</span>
+                <input type="checkbox" value="gemini-2.5-pro" class="combo-box" style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>gemini-2.5-flash</span>
+                <input type="checkbox" value="gemini-2.5-flash" class="combo-box" style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>gemini-1.5-pro</span>
+                <input type="checkbox" value="gemini-1.5-pro" class="combo-box" style="display:none;" />
+              </span>
             </div>
 
-            <div>
-              <div style="font-size: 0.75rem; font-weight: 700; color: #10b981; margin-bottom: 4px; text-transform: uppercase;">
-                🤖 OpenAI & DeepSeek Reasoning
-              </div>
-              <div style="display: flex; gap: 14px; flex-wrap: wrap;">
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="gpt-4o" class="combo-box" /> gpt-4o
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="deepseek-r1" class="combo-box" /> deepseek-r1
-                </label>
-                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.82rem; cursor: pointer;">
-                  <input type="checkbox" value="deepseek-v3" class="combo-box" /> deepseek-v3
-                </label>
-              </div>
+            <!-- Group 2: Claude -->
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #c084fc; min-width: 120px;">🧠 Claude Pro:</span>
+              <span class="model-toggle-chip active" onclick="toggleModelChip(this)">
+                <span>claude-3-7-sonnet</span>
+                <input type="checkbox" value="claude-3-7-sonnet" class="combo-box" checked style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>claude-3-7-sonnet-thinking</span>
+                <input type="checkbox" value="claude-3-7-sonnet-thinking" class="combo-box" style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>claude-3-5-sonnet</span>
+                <input type="checkbox" value="claude-3-5-sonnet" class="combo-box" style="display:none;" />
+              </span>
             </div>
-          </div>
 
-          <div style="margin-top: 4px;">
-            <button class="btn-action primary" onclick="submitCreateCombo()">+ Lưu Model Combo</button>
+            <!-- Group 3: OpenAI / DeepSeek -->
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.72rem; font-weight: 700; color: #34d399; min-width: 120px;">🤖 OpenAI / DeepSeek:</span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>gpt-4o</span>
+                <input type="checkbox" value="gpt-4o" class="combo-box" style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>deepseek-r1</span>
+                <input type="checkbox" value="deepseek-r1" class="combo-box" style="display:none;" />
+              </span>
+              <span class="model-toggle-chip" onclick="toggleModelChip(this)">
+                <span>deepseek-v3</span>
+                <input type="checkbox" value="deepseek-v3" class="combo-box" style="display:none;" />
+              </span>
+            </div>
           </div>
         </div>
 
-        <h4 style="font-size: 0.95rem; font-weight: 700; margin-top: 18px;">Danh Sách Combos Hoạt Động</h4>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; margin-bottom: 8px;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">📋 Danh Sách Combos Đang Hoạt Động</h4>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Tự động đồng bộ với OpenAI Gateway (/v1/chat/completions)</span>
+        </div>
         <div id="combos-grid-deck" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px;">
           <p style="color: var(--text-muted);">Đang tải Combos...</p>
         </div>
@@ -1997,6 +2089,67 @@
         <button class="btn-action" style="width: 100%; padding: 8px; font-size: 0.78rem; background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; font-weight: 700; border-radius: 6px;" onclick="submitManualWebCookie()">
           ⚡ Kích Hoạt Ngay Bằng Cookie Này
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDIT MODEL COMBO (1-CLICK SELECTION)             -->
+  <!-- ======================================================== -->
+  <div class="modal-backdrop" id="modal-edit-combo">
+    <div class="modal-dialog" style="max-width: 520px; border-color: rgba(192, 132, 252, 0.4); box-shadow: 0 0 35px rgba(192, 132, 252, 0.2);">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #c084fc;">
+          <span>✏️ Chỉnh Sửa Model Combo</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeEditComboModal()">&times;</button>
+      </div>
+
+      <input type="hidden" id="edit-combo-id" />
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div style="flex: 1.5; min-width: 180px;">
+          <label style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">TÊN COMBO:</label>
+          <input type="text" id="edit-combo-name" class="input-box" placeholder="Tên Combo..." />
+        </div>
+        <div style="flex: 1.2; min-width: 170px;">
+          <label style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">CHIẾN LƯỢC:</label>
+          <select id="edit-combo-strategy" class="input-box">
+            <option value="fallback">Fallback (Ưu tiên tuần tự)</option>
+            <option value="round-robin">Round-Robin (Luân phiên)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Current models in edit modal -->
+      <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Danh sách Model hiện tại:</span>
+          <span id="edit-combo-count" style="font-size: 0.72rem; color: #c084fc; font-weight: 700; font-family: var(--font-mono);">0 model</span>
+        </div>
+        <div id="edit-combo-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 42px; align-items: center;">
+          <!-- Dynamically populated chips -->
+        </div>
+      </div>
+
+      <!-- Add model to combo via dropdown picker -->
+      <div>
+        <label style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">CHỌN MODEL THÊM VÀO (1-CLICK KHÔNG CẦN GÕ):</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="edit-combo-model-picker" class="input-box" style="flex: 1;" onchange="handleEditModalSelectChange(this)">
+            <!-- Populated via getModelPickerOptionsHtml() -->
+          </select>
+          <button class="btn-action primary" onclick="submitAddModelInEditModal()">➕ Thêm Model</button>
+        </div>
+        <div id="edit-combo-custom-row" style="display: none; gap: 8px; align-items: center; margin-top: 8px;">
+          <input type="text" id="edit-combo-custom-input" class="input-box" placeholder="Nhập tên model tùy chỉnh..." style="flex: 1;" onkeydown="if(event.key==='Enter') submitAddCustomModelInEditModal()" />
+          <button class="btn-action" onclick="submitAddCustomModelInEditModal()">Xác Nhận</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 4px;">
+        <button class="btn-action" onclick="closeEditComboModal()">Hủy Bỏ</button>
+        <button class="btn-action primary" onclick="saveEditComboModal()" style="background: linear-gradient(135deg, #a855f7, #7c3aed); border-color: #c084fc;">💾 Lưu Thay Đổi</button>
       </div>
     </div>
   </div>
@@ -3024,19 +3177,67 @@
       } catch (_) {}
     }
 
-    // --- MODEL COMBOS ---
+    // --- MODEL COMBOS & SELECTION MANAGER ---
+    const AVAILABLE_MODELS = [
+      {
+        group: '💎 Google Gemini',
+        models: [
+          { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash (Siêu Tốc)' },
+          { id: 'gemini-3.8-pro', label: 'gemini-3.8-pro (Tư duy sâu)' },
+          { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
+          { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
+          { id: 'gemini-1.5-pro', label: 'gemini-1.5-pro' },
+          { id: 'gemini-1.5-flash', label: 'gemini-1.5-flash' }
+        ]
+      },
+      {
+        group: '🧠 Anthropic Claude',
+        models: [
+          { id: 'claude-3-7-sonnet', label: 'claude-3-7-sonnet (Claude 3.7 Pro)' },
+          { id: 'claude-3-7-sonnet-thinking', label: 'claude-3-7-thinking (Suy luận)' },
+          { id: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet' }
+        ]
+      },
+      {
+        group: '🤖 OpenAI & DeepSeek',
+        models: [
+          { id: 'gpt-4o', label: 'gpt-4o (OpenAI)' },
+          { id: 'deepseek-r1', label: 'deepseek-r1 (Reasoning)' },
+          { id: 'deepseek-v3', label: 'deepseek-v3' }
+        ]
+      }
+    ];
+
+    function getModelPickerOptionsHtml(defaultPlaceholder = '-- Chọn Model để thêm vào --') {
+      let html = `<option value="">${defaultPlaceholder}</option>`;
+      AVAILABLE_MODELS.forEach(grp => {
+        html += `<optgroup label="${grp.group}">`;
+        grp.models.forEach(m => {
+          html += `<option value="${m.id}">${m.label}</option>`;
+        });
+        html += `</optgroup>`;
+      });
+      html += `<option value="__custom__">➕ Nhập model tùy chỉnh khác...</option>`;
+      return html;
+    }
+
+    let cachedCombosList = [];
+    let currentEditingCombo = null;
+
     async function fetchCombos() {
       try {
         const res = await fetch('/api/combos');
         const data = await res.json();
-        renderCombosDeck(data.combos || []);
+        cachedCombosList = data.combos || [];
+        renderCombosDeck(cachedCombosList);
       } catch (_) {}
     }
 
     function renderCombosDeck(combos) {
       const deck = document.getElementById('combos-grid-deck');
+      if (!deck) return;
       if (!combos || combos.length === 0) {
-        deck.innerHTML = `<p style="color: var(--text-muted); grid-column: 1 / -1;">Chưa có Combo nào.</p>`;
+        deck.innerHTML = `<p style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px 0;">Chưa có Combo nào được tạo.</p>`;
         return;
       }
 
@@ -3046,12 +3247,12 @@
             <strong style="color: #c084fc; font-size: 1.05rem;">${c.name}</strong>
             <div style="display: flex; gap: 6px; align-items: center;">
               <span class="pill-badge pill-model">${c.strategy.toUpperCase()}</span>
-              <button class="btn-action" style="padding: 2px 7px; font-size: 0.72rem;" onclick="editComboPrompt('${c.id}', '${c.name}', '${c.strategy}')" title="Sửa tên hoặc chiến lược">✏️ Sửa</button>
+              <button class="btn-action btn-sm" onclick="openEditComboModal('${c.id}')" title="Chỉnh sửa tên, chiến lược và danh sách model">✏️ Sửa</button>
             </div>
           </div>
 
           <!-- Chip list of models in combo -->
-          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; min-height: 48px;">
+          <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; min-height: 44px;">
             <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Danh sách Model (${c.models.length}):</div>
             <div style="display: flex; flex-wrap: wrap; gap: 4px;">
               ${c.models.map(m => `
@@ -3063,26 +3264,64 @@
             </div>
           </div>
 
-          <!-- Add custom model to combo -->
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <input type="text" id="input-add-model-${c.id}" class="input-box" placeholder="Thêm model (vd: gemini-2.5-pro)..." style="font-size: 0.76rem; padding: 5px 8px; flex: 1;" onkeydown="if(event.key==='Enter') submitAddModel('${c.id}')" />
-            <button class="btn-action primary" style="padding: 5px 10px; font-size: 0.76rem; white-space: nowrap;" onclick="submitAddModel('${c.id}')">➕ Thêm</button>
+          <!-- Add model to combo via balanced combobox selection -->
+          <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
+            <select id="select-add-model-${c.id}" class="input-box input-sm" style="flex: 1;" onchange="handleComboModelSelectChange('${c.id}', this)">
+              ${getModelPickerOptionsHtml('-- Chọn Model thêm vào --')}
+            </select>
+            <button class="btn-action primary btn-sm" onclick="submitAddModelFromSelect('${c.id}')">➕ Thêm</button>
+          </div>
+          <div id="custom-model-row-${c.id}" style="display: none; gap: 6px; align-items: center; margin-top: 4px;">
+            <input type="text" id="input-custom-model-${c.id}" class="input-box input-sm" placeholder="Nhập tên model tùy chỉnh..." style="flex: 1;" onkeydown="if(event.key==='Enter') submitCustomModel('${c.id}')" />
+            <button class="btn-action btn-sm" onclick="submitCustomModel('${c.id}')">Lưu</button>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.05);">
-            <button class="btn-action" style="flex: 1; padding: 5px; font-size: 0.75rem;" onclick="copyPlain('${c.name}')">📋 Copy Tên Model</button>
-            <button class="btn-action danger" style="padding: 5px 10px; font-size: 0.75rem;" onclick="removeCombo('${c.id}')" title="Xóa toàn bộ combo">🗑️ Xóa</button>
+          <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
+            <button class="btn-action btn-sm" style="flex: 1;" onclick="copyPlain('${c.name}')">📋 Copy Tên Model</button>
+            <button class="btn-action danger btn-sm" onclick="removeCombo('${c.id}')" title="Xóa toàn bộ combo">🗑️ Xóa</button>
           </div>
         </div>
       `).join('');
     }
 
-    async function submitAddModel(comboId) {
-      const input = document.getElementById(`input-add-model-${comboId}`);
+    function handleComboModelSelectChange(comboId, selectEl) {
+      const customRow = document.getElementById(`custom-model-row-${comboId}`);
+      if (!customRow) return;
+      if (selectEl.value === '__custom__') {
+        customRow.style.display = 'flex';
+        const input = document.getElementById(`input-custom-model-${comboId}`);
+        if (input) input.focus();
+      } else {
+        customRow.style.display = 'none';
+      }
+    }
+
+    async function submitAddModelFromSelect(comboId) {
+      const select = document.getElementById(`select-add-model-${comboId}`);
+      if (!select) return;
+      const model = select.value.trim();
+      if (!model) return toast('Vui lòng chọn một model từ danh sách!');
+      if (model === '__custom__') {
+        return submitCustomModel(comboId);
+      }
+      await executeAddModelApi(comboId, model);
+      select.value = '';
+    }
+
+    async function submitCustomModel(comboId) {
+      const input = document.getElementById(`input-custom-model-${comboId}`);
       if (!input) return;
       const model = input.value.trim();
-      if (!model) return toast('Vui lòng nhập tên model cần thêm');
+      if (!model) return toast('Vui lòng nhập tên model tùy chỉnh!');
+      await executeAddModelApi(comboId, model);
+      input.value = '';
+      const customRow = document.getElementById(`custom-model-row-${comboId}`);
+      if (customRow) customRow.style.display = 'none';
+      const select = document.getElementById(`select-add-model-${comboId}`);
+      if (select) select.value = '';
+    }
 
+    async function executeAddModelApi(comboId, model) {
       try {
         const res = await fetch(`/api/combos/${encodeURIComponent(comboId)}/models`, {
           method: 'POST',
@@ -3090,7 +3329,7 @@
           body: JSON.stringify({ model })
         });
         if (res.ok) {
-          toast(`✓ Đã thêm model [${model}] vào combo`);
+          toast(`✓ Đã thêm model [${model}] vào combo!`);
           fetchCombos();
         } else {
           const err = await res.json();
@@ -3114,34 +3353,165 @@
       } catch (_) {}
     }
 
-    async function editComboPrompt(comboId, currentName, currentStrategy) {
-      const newName = prompt('Nhập tên mới cho Combo:', currentName);
-      if (newName === null || !newName.trim()) return;
-      const newStrat = prompt('Nhập chiến lược (fallback hoặc round-robin):', currentStrategy) || currentStrategy;
+    // --- EDIT COMBO MODAL HANDLERS ---
+    function openEditComboModal(comboId) {
+      const combo = (cachedCombosList || []).find(c => c.id === comboId);
+      if (!combo) return;
+      currentEditingCombo = JSON.parse(JSON.stringify(combo));
+
+      const idEl = document.getElementById('edit-combo-id');
+      const nameEl = document.getElementById('edit-combo-name');
+      const stratEl = document.getElementById('edit-combo-strategy');
+      const pickerEl = document.getElementById('edit-combo-model-picker');
+      const customRow = document.getElementById('edit-combo-custom-row');
+
+      if (idEl) idEl.value = currentEditingCombo.id;
+      if (nameEl) nameEl.value = currentEditingCombo.name;
+      if (stratEl) stratEl.value = currentEditingCombo.strategy;
+      if (pickerEl) {
+        pickerEl.innerHTML = getModelPickerOptionsHtml('-- Chọn Model để thêm vào --');
+        pickerEl.value = '';
+      }
+      if (customRow) customRow.style.display = 'none';
+
+      renderEditComboModalChips();
+
+      const modal = document.getElementById('modal-edit-combo');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeEditComboModal() {
+      const modal = document.getElementById('modal-edit-combo');
+      if (modal) modal.classList.remove('open');
+      currentEditingCombo = null;
+    }
+
+    function renderEditComboModalChips() {
+      if (!currentEditingCombo) return;
+      const container = document.getElementById('edit-combo-chips-container');
+      const countEl = document.getElementById('edit-combo-count');
+      if (countEl) countEl.innerText = `${currentEditingCombo.models.length} model`;
+
+      if (!container) return;
+      if (currentEditingCombo.models.length === 0) {
+        container.innerHTML = '<span style="color: var(--text-muted); font-size: 0.78rem;">Chưa có model nào trong combo này. Hãy chọn thêm bên dưới!</span>';
+        return;
+      }
+
+      container.innerHTML = currentEditingCombo.models.map(m => `
+        <span class="model-chip-tag">
+          <span>${m}</span>
+          <button class="model-chip-remove" onclick="removeModelInEditModal('${m}')" title="Xóa model [${m}]">✕</button>
+        </span>
+      `).join('');
+    }
+
+    function removeModelInEditModal(model) {
+      if (!currentEditingCombo) return;
+      currentEditingCombo.models = currentEditingCombo.models.filter(m => m !== model);
+      renderEditComboModalChips();
+    }
+
+    function handleEditModalSelectChange(selectEl) {
+      const customRow = document.getElementById('edit-combo-custom-row');
+      if (!customRow) return;
+      if (selectEl.value === '__custom__') {
+        customRow.style.display = 'flex';
+        const input = document.getElementById('edit-combo-custom-input');
+        if (input) input.focus();
+      } else {
+        customRow.style.display = 'none';
+      }
+    }
+
+    function submitAddModelInEditModal() {
+      if (!currentEditingCombo) return;
+      const picker = document.getElementById('edit-combo-model-picker');
+      if (!picker) return;
+      const val = picker.value.trim();
+      if (!val) {
+        toast('Vui lòng chọn một model từ danh sách!');
+        return;
+      }
+      if (val === '__custom__') {
+        return submitAddCustomModelInEditModal();
+      }
+      if (currentEditingCombo.models.includes(val)) {
+        toast(`Model [${val}] đã có trong combo!`);
+        return;
+      }
+      currentEditingCombo.models.push(val);
+      picker.value = '';
+      renderEditComboModalChips();
+      toast(`✓ Đã thêm model [${val}]`);
+    }
+
+    function submitAddCustomModelInEditModal() {
+      if (!currentEditingCombo) return;
+      const input = document.getElementById('edit-combo-custom-input');
+      const val = input ? input.value.trim() : '';
+      if (!val) return toast('Vui lòng nhập tên model tùy chỉnh!');
+      if (currentEditingCombo.models.includes(val)) {
+        toast(`Model [${val}] đã có trong combo!`);
+        return;
+      }
+      currentEditingCombo.models.push(val);
+      input.value = '';
+      const customRow = document.getElementById('edit-combo-custom-row');
+      if (customRow) customRow.style.display = 'none';
+      const picker = document.getElementById('edit-combo-model-picker');
+      if (picker) picker.value = '';
+      renderEditComboModalChips();
+      toast(`✓ Đã thêm model [${val}]`);
+    }
+
+    async function saveEditComboModal() {
+      if (!currentEditingCombo) return;
+      const name = document.getElementById('edit-combo-name').value.trim();
+      const strategy = document.getElementById('edit-combo-strategy').value;
+      if (!name) return toast('Tên Combo không được để trống!');
+      if (currentEditingCombo.models.length === 0) return toast('Combo phải có ít nhất 1 model!');
+
       try {
-        const res = await fetch(`/api/combos/${encodeURIComponent(comboId)}`, {
+        const res = await fetch(`/api/combos/${encodeURIComponent(currentEditingCombo.id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim(), strategy: newStrat.trim() })
+          body: JSON.stringify({ name, strategy, models: currentEditingCombo.models })
         });
         if (res.ok) {
-          toast('✓ Đã cập nhật Combo!');
+          toast(`✓ Đã lưu thay đổi cho Combo [${name}]!`);
+          closeEditComboModal();
           fetchCombos();
+        } else {
+          const err = await res.json();
+          toast('Lỗi: ' + (err.error || 'Không thể lưu thay đổi'));
         }
       } catch (err) {
-        toast('Lỗi: ' + err.message);
+        toast('Lỗi kết nối: ' + err.message);
       }
+    }
+
+    // --- TOGGLE CHIP & PRESET HANDLERS ---
+    function toggleModelChip(chipEl) {
+      const checkbox = chipEl.querySelector('.combo-box');
+      if (!checkbox) return;
+      checkbox.checked = !checkbox.checked;
+      chipEl.classList.toggle('active', checkbox.checked);
     }
 
     function applySmartPreset(presetKey) {
       const titleInput = document.getElementById('combo-title');
-      const checks = document.querySelectorAll('.combo-box');
-      checks.forEach(c => c.checked = false);
+      const chips = document.querySelectorAll('.model-toggle-chip');
+      chips.forEach(chip => {
+        const cb = chip.querySelector('.combo-box');
+        if (cb) cb.checked = false;
+        chip.classList.remove('active');
+      });
 
       let targetModels = [];
       if (presetKey === 'smart-pro') {
         titleInput.value = 'AI';
-        targetModels = ['gemini-3.8-flash', 'gemini-4-argon-high', 'claude-3-7-sonnet'];
+        targetModels = ['gemini-3.8-flash', 'gemini-3.8-pro', 'claude-3-7-sonnet'];
       } else if (presetKey === 'fast-pro') {
         titleInput.value = 'pro-fast';
         targetModels = ['gemini-3.8-flash', 'gemini-2.5-flash'];
@@ -3150,8 +3520,12 @@
         targetModels = ['claude-3-7-sonnet', 'claude-3-5-sonnet', 'gemini-3.8-flash'];
       }
 
-      checks.forEach(c => {
-        if (targetModels.includes(c.value)) c.checked = true;
+      chips.forEach(chip => {
+        const cb = chip.querySelector('.combo-box');
+        if (cb && targetModels.includes(cb.value)) {
+          cb.checked = true;
+          chip.classList.add('active');
+        }
       });
       toast(`✓ Đã áp dụng Preset: ${titleInput.value}`);
     }
@@ -3173,6 +3547,9 @@
           toast(`✓ Đã lưu Model Combo [${name}]!`);
           document.getElementById('combo-title').value = '';
           fetchCombos();
+        } else {
+          const err = await res.json();
+          toast('Lỗi: ' + (err.error || 'Không thể tạo combo'));
         }
       } catch (_) {}
     }
