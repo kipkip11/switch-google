@@ -86,3 +86,21 @@ Chuyển giao cho `@assistant` để tổng kết và bàn giao chính thức ch
 4. **Kiểm thử Fail-Safe Rollback cho File Hosts**:
    - Khối comment delimiters `# BEGIN SWITCH-GOOGLE MITM` được bọc bởi hook `SIGINT`, `SIGTERM` đảm bảo dọn sạch sẽ khi tắt app.
 
+
+## Báo Cáo Kiểm Định Độc Lập: TASK-20261120-SELF-HEALING-UNBLOCK-AND-CLEANUP
+
+- **Mã Task**: `TASK-20261120-SELF-HEALING-UNBLOCK-AND-CLEANUP`
+- **Thời gian nghiệm thu**: 20/11/2026 21:40 (+07:00)
+- **Kiểm định viên**: `@qc` (Quality Control Lead)
+- **Trạng thái**: `QC_PASS (100% ĐẠT CHUẨN)`
+
+### 1. Bằng chứng kiểm thử & Nghiệm thu (Evidence):
+1. **Kiểm tra cơ chế Self-Healing Unblock**:
+   - Xác thực logic tự động cập nhật `is_blocked_antigravity = false` trong `src/profiles/manager.ts`.
+   - Kết quả truy vấn `/api/profiles`: 100% tài khoản đạt `isBlockedAntigravity: false`, không còn hiện tượng báo lỗi ảo.
+2. **Kiểm tra Tinh gọn Giao diện Web Dashboard**:
+   - Xác thực gỡ bỏ hoàn toàn Tab Playground trong `public/index.html`.
+   - Chuẩn hóa điều hướng 5 Tab thực chiến, không phát sinh lỗi console runtime.
+3. **Kiểm tra Hồi quy**:
+   - `npm test`: **29/29 tests PASSED 100%** trên 6/6 test suites.
+

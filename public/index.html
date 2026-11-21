@@ -11,21 +11,22 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --bg-base: #060911;
-      --bg-surface: #0c111d;
-      --bg-card: rgba(16, 23, 38, 0.75);
-      --bg-card-hover: rgba(22, 32, 54, 0.85);
-      --border-subtle: rgba(255, 255, 255, 0.07);
-      --border-focus: rgba(56, 189, 248, 0.4);
-      --primary: #38bdf8;
-      --primary-glow: rgba(56, 189, 248, 0.25);
-      --success: #10b981;
-      --success-glow: rgba(16, 185, 129, 0.25);
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --purple: #a855f7;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
+      /* High-Contrast Clean Light Palette (Slate-50) */
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f1f5f9;
+      --border-subtle: #cbd5e1;
+      --border-focus: #2563eb;
+      --primary: #2563eb;
+      --primary-glow: rgba(37, 99, 235, 0.15);
+      --success: #059669;
+      --success-glow: rgba(5, 150, 105, 0.15);
+      --warning: #d97706;
+      --danger: #dc2626;
+      --purple: #7c3aed;
+      --text-main: #0f172a;
+      --text-muted: #334155;
       --text-subtle: #64748b;
       --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
@@ -41,8 +42,8 @@
       display: flex;
       flex-direction: column;
       background-image: 
-        radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.12), transparent 45%),
-        radial-gradient(circle at 85% 100%, rgba(16, 185, 129, 0.08), transparent 45%);
+        radial-gradient(circle at 15% 0%, rgba(37, 99, 235, 0.05), transparent 45%),
+        radial-gradient(circle at 85% 100%, rgba(5, 150, 105, 0.05), transparent 45%);
       background-attachment: fixed;
       -webkit-font-smoothing: antialiased;
     }
@@ -50,8 +51,8 @@
     /* Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: var(--bg-base); }
-    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
     /* ======================================================== */
     /* TOP SLIM NAVBAR                                          */
@@ -66,7 +67,8 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(6, 9, 17, 0.88);
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
     }
 
     .brand-section {
@@ -1554,16 +1556,19 @@
         🔌 1. Switch Rack & Cáp Laser <span class="tab-badge" id="badge-port-count">0</span>
       </button>
       <button class="nav-tab-btn" id="tab-btn-analytics" onclick="navigateTab('analytics')">
-        📊 2. Biểu Đồ Token Realtime (NOC HUD)
+        📊 2. Thống Kê Token (Ngày/Tháng/Năm)
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-quotas" onclick="navigateTab('quotas')">
+        ⏱️ 3. Quota & Giới Hạn Từng Model
       </button>
       <button class="nav-tab-btn" id="tab-btn-combos" onclick="navigateTab('combos')">
-        🧩 3. Model Combos
+        🧩 4. Model Combos
       </button>
       <button class="nav-tab-btn" id="tab-btn-keys" onclick="navigateTab('keys')">
-        🔑 4. Virtual API Keys <span class="tab-badge" id="badge-key-count">1</span>
+        🔑 5. Virtual API Keys <span class="tab-badge" id="badge-key-count">1</span>
       </button>
       <button class="nav-tab-btn" id="tab-btn-integration" onclick="navigateTab('integration')">
-        🚀 5. Tích Hợp 1-Click & Antigravity Direct Link
+        🚀 6. Tích Hợp 1-Click & Antigravity Direct Link
       </button>
     </div>
 
@@ -1898,40 +1903,46 @@
           </div>
 
           <!-- Timeframe Selector -->
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <div class="timeframe-pill-group">
-              <button class="timeframe-btn" id="tf-btn-60s" onclick="switchTimeframe('60s')">60 Giây</button>
-              <button class="timeframe-btn" id="tf-btn-1h" onclick="switchTimeframe('1h')">1 Giờ</button>
-              <button class="timeframe-btn" id="tf-btn-6h" onclick="switchTimeframe('6h')">6 Giờ</button>
-              <button class="timeframe-btn active" id="tf-btn-24h" onclick="switchTimeframe('24h')">24 Giờ</button>
+              <button class="timeframe-btn" id="tf-btn-hour" onclick="switchAnalyticsPeriod('hour')">Theo Giờ</button>
+              <button class="timeframe-btn active" id="tf-btn-day" onclick="switchAnalyticsPeriod('day')">Theo Ngày</button>
+              <button class="timeframe-btn" id="tf-btn-month" onclick="switchAnalyticsPeriod('month')">Theo Tháng</button>
+              <button class="timeframe-btn" id="tf-btn-year" onclick="switchAnalyticsPeriod('year')">Theo Năm</button>
             </div>
-            <button class="btn-action" onclick="fetchAnalyticsData()">🔄 Làm Mới</button>
+            <button class="btn-action primary" onclick="loadDetailedAnalytics()">🔄 Cập Nhật Biểu Đồ</button>
           </div>
         </div>
 
-        <div style="height: 310px; width: 100%;">
+        <div style="height: 320px; width: 100%;">
           <canvas id="canvas-timeline-chart"></canvas>
         </div>
       </div>
 
       <!-- Breakdown Charts Row -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px;">
         <div class="chart-container-card">
-          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-            <span>🧠</span>
-            <span>Tỷ Trọng Token Theo Model</span>
-          </h3>
-          <div style="height: 250px; display: flex; align-items: center; justify-content: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <span>🧠</span>
+              <span>Phân Bổ Token Theo Model</span>
+            </h3>
+            <span class="badge" id="badge-total-models" style="background: rgba(37, 99, 235, 0.1); color: var(--primary);">0 Models</span>
+          </div>
+          <div style="height: 260px; display: flex; align-items: center; justify-content: center;">
             <canvas id="canvas-model-chart"></canvas>
           </div>
         </div>
 
         <div class="chart-container-card">
-          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-            <span>🔌</span>
-            <span>Phân Bổ Lưu Lượng Qua Từng Cổng Switch</span>
-          </h3>
-          <div style="height: 250px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <span>🔌</span>
+              <span>Tỷ Trọng Lưu Lượng Từng Tài Khoản (Pool)</span>
+            </h3>
+            <span class="badge" id="badge-total-accounts" style="background: rgba(5, 150, 105, 0.1); color: var(--success);">5 Cổng</span>
+          </div>
+          <div style="height: 260px;">
             <canvas id="canvas-account-chart"></canvas>
           </div>
         </div>
@@ -1974,6 +1985,133 @@
               <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Đang đồng bộ nhật ký giao dịch token...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: THEO DÕI QUOTA & HẠN NGẠCH TỪNG MODEL (NEW)       -->
+    <!-- ======================================================== -->
+    <div class="view-pane" id="pane-quotas">
+      <div class="chart-container-card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+              <span>⏱️ Theo Dõi Quota & Hạn Ngạch Còn Lại Của Từng Model</span>
+            </h3>
+            <p style="font-size: 0.8rem; color: #334155; margin-top: 2px;">
+              Giám sát hạn mức token, tốc độ RPM/TPM và số tài khoản sẵn sàng phục vụ cho từng dòng Model AI cao cấp.
+            </p>
+          </div>
+          <button class="btn-action primary" onclick="loadDetailedAnalytics()">🔄 Làm Mới Quota</button>
+        </div>
+      </div>
+
+      <!-- Quotas Grid Container -->
+      <div id="quotas-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px;">
+        <!-- Card Claude 3.7 Sonnet -->
+        <div class="chart-container-card" style="border-top: 4px solid #7c3aed;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.4rem;">🧠</span>
+              <div>
+                <h4 style="font-size: 1rem; font-weight: 800; color: #0f172a;">Claude 3.7 Sonnet</h4>
+                <span style="font-size: 0.72rem; color: #64748b;">Hybrid Reasoning & Code Master</span>
+              </div>
+            </div>
+            <span class="badge" style="background: rgba(124, 58, 237, 0.1); color: #7c3aed; font-weight: 700;">ĐỈNH CAO CODE</span>
+          </div>
+
+          <div style="margin: 14px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">
+              <span style="color: #334155;">Hạn Mức Token Ước Tính:</span>
+              <span id="quota-claude-pct" style="color: #7c3aed;">100% Sẵn Sàng</span>
+            </div>
+            <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
+              <div id="quota-claude-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #7c3aed, #a855f7); border-radius: 5px; transition: width 0.4s;"></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; font-size: 0.78rem;">
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tốc Độ Tối Đa (RPM):</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #0f172a; margin-top: 2px;" id="quota-claude-rpm">300 req/m</div>
+            </div>
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tài Khoản Phục Vụ:</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #059669; margin-top: 2px;" id="quota-claude-accs">5 / 5 Cổng UP</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Gemini 3.8 Flash -->
+        <div class="chart-container-card" style="border-top: 4px solid #0284c7;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.4rem;">⚡</span>
+              <div>
+                <h4 style="font-size: 1rem; font-weight: 800; color: #0f172a;">Gemini 3.8 Flash</h4>
+                <span style="font-size: 0.72rem; color: #64748b;">Ultra-Fast Response (< 0.5s)</span>
+              </div>
+            </div>
+            <span class="badge" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; font-weight: 700;">SIÊU TỐC ĐỘ</span>
+          </div>
+
+          <div style="margin: 14px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">
+              <span style="color: #334155;">Hạn Mức Token Ước Tính:</span>
+              <span id="quota-flash-pct" style="color: #0284c7;">100% Sẵn Sàng</span>
+            </div>
+            <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
+              <div id="quota-flash-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #0284c7, #38bdf8); border-radius: 5px; transition: width 0.4s;"></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; font-size: 0.78rem;">
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tốc Độ Tối Đa (RPM):</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #0f172a; margin-top: 2px;" id="quota-flash-rpm">600 req/m</div>
+            </div>
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tài Khoản Phục Vụ:</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #059669; margin-top: 2px;" id="quota-flash-accs">5 / 5 Cổng UP</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Gemini 4 Argon / 2.5 Pro -->
+        <div class="chart-container-card" style="border-top: 4px solid #d97706;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.4rem;">👑</span>
+              <div>
+                <h4 style="font-size: 1rem; font-weight: 800; color: #0f172a;">Gemini 4 Argon / 2.5 Pro</h4>
+                <span style="font-size: 0.72rem; color: #64748b;">Deep Reasoning & 2M Context</span>
+              </div>
+            </div>
+            <span class="badge" style="background: rgba(217, 119, 6, 0.1); color: #d97706; font-weight: 700;">NGỮ CẢNH 2M</span>
+          </div>
+
+          <div style="margin: 14px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">
+              <span style="color: #334155;">Hạn Mức Token Ước Tính:</span>
+              <span id="quota-argon-pct" style="color: #d97706;">100% Sẵn Sàng</span>
+            </div>
+            <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
+              <div id="quota-argon-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #d97706, #fbbf24); border-radius: 5px; transition: width 0.4s;"></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; font-size: 0.78rem;">
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tốc Độ Tối Đa (RPM):</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #0f172a; margin-top: 2px;" id="quota-argon-rpm">300 req/m</div>
+            </div>
+            <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">Tài Khoản Phục Vụ:</span>
+              <div style="font-weight: 800; font-size: 1rem; color: #059669; margin-top: 2px;" id="quota-argon-accs">5 / 5 Cổng UP</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2581,6 +2719,9 @@ curl http://localhost:1909/v1/chat/completions \
       if (tabKey === 'analytics') {
         fetchAnalyticsData();
         fetchAuditLogs();
+      }
+      if (tabKey === 'quotas') {
+        loadDetailedAnalytics();
       }
       if (tabKey === 'keys') fetchApiKeys();
       if (tabKey === 'combos') fetchCombos();
@@ -3250,6 +3391,221 @@ curl http://localhost:1909/v1/chat/completions \
       fetchAnalyticsData();
     }
 
+    let currentAnalyticsPeriod = 'day';
+
+    function switchAnalyticsPeriod(period) {
+      currentAnalyticsPeriod = period;
+      ['hour', 'day', 'month', 'year'].forEach(p => {
+        const btn = document.getElementById(`tf-btn-${p}`);
+        if (btn) {
+          if (p === period) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+      loadDetailedAnalytics();
+    }
+
+    async function loadDetailedAnalytics() {
+      try {
+        const res = await fetch(`/api/analytics/summary?period=${currentAnalyticsPeriod}`);
+        const data = await res.json();
+
+        // Cập nhật biểu đồ dòng thời gian
+        drawTimelineChartSummary(data.timeline || []);
+
+        // Cập nhật biểu đồ Model
+        drawModelBarChart(data.modelDistribution || {});
+
+        // Cập nhật biểu đồ Tài khoản
+        drawAccountDonutChart(data.accountDistribution || {});
+
+        // Cập nhật Quotas Cards
+        renderQuotasCards(data.quotas || []);
+      } catch (err) {
+        console.error('Lỗi khi tải chi tiết analytics:', err);
+      }
+    }
+
+    function renderQuotasCards(quotas) {
+      quotas.forEach(q => {
+        if (q.id === 'claude-3-7-sonnet') {
+          const pct = Math.max(0, 100 - Math.round((q.usedToday / q.dailyLimit) * 100));
+          const pctEl = document.getElementById('quota-claude-pct');
+          const barEl = document.getElementById('quota-claude-bar');
+          const rpmEl = document.getElementById('quota-claude-rpm');
+          const accsEl = document.getElementById('quota-claude-accs');
+          if (pctEl) pctEl.innerText = `${pct}% Sẵn Sàng (${formatTokens(q.dailyLimit - q.usedToday)} tok)`;
+          if (barEl) barEl.style.width = `${pct}%`;
+          if (rpmEl) rpmEl.innerText = `${q.rpmLimit} req/m`;
+          if (accsEl) accsEl.innerText = `${q.availableAccounts} Cổng Sẵn Sàng`;
+        } else if (q.id === 'gemini-3.8-flash') {
+          const pct = Math.max(0, 100 - Math.round((q.usedToday / q.dailyLimit) * 100));
+          const pctEl = document.getElementById('quota-flash-pct');
+          const barEl = document.getElementById('quota-flash-bar');
+          const rpmEl = document.getElementById('quota-flash-rpm');
+          const accsEl = document.getElementById('quota-flash-accs');
+          if (pctEl) pctEl.innerText = `${pct}% Sẵn Sàng (${formatTokens(q.dailyLimit - q.usedToday)} tok)`;
+          if (barEl) barEl.style.width = `${pct}%`;
+          if (rpmEl) rpmEl.innerText = `${q.rpmLimit} req/m`;
+          if (accsEl) accsEl.innerText = `${q.availableAccounts} Cổng Sẵn Sàng`;
+        } else if (q.id === 'gemini-4-argon') {
+          const pct = Math.max(0, 100 - Math.round((q.usedToday / q.dailyLimit) * 100));
+          const pctEl = document.getElementById('quota-argon-pct');
+          const barEl = document.getElementById('quota-argon-bar');
+          const rpmEl = document.getElementById('quota-argon-rpm');
+          const accsEl = document.getElementById('quota-argon-accs');
+          if (pctEl) pctEl.innerText = `${pct}% Sẵn Sàng (${formatTokens(q.dailyLimit - q.usedToday)} tok)`;
+          if (barEl) barEl.style.width = `${pct}%`;
+          if (rpmEl) rpmEl.innerText = `${q.rpmLimit} req/m`;
+          if (accsEl) accsEl.innerText = `${q.availableAccounts} Cổng Sẵn Sàng`;
+        }
+      });
+    }
+
+    function drawTimelineChartSummary(timeline) {
+      const ctx = document.getElementById('canvas-timeline-chart').getContext('2d');
+      if (chartTimelineObj) chartTimelineObj.destroy();
+
+      const labels = timeline.map(t => t.label);
+      const promptValues = timeline.map(t => t.prompt);
+      const completionValues = timeline.map(t => t.completion);
+
+      chartTimelineObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.length ? labels : ['Chưa có dữ liệu'],
+          datasets: [
+            {
+              label: 'Prompt Tokens (Input)',
+              data: promptValues.length ? promptValues : [0],
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              fill: true,
+              tension: 0.3,
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#2563eb'
+            },
+            {
+              label: 'Completion Tokens (Output)',
+              data: completionValues.length ? completionValues : [0],
+              borderColor: '#059669',
+              backgroundColor: 'rgba(5, 150, 105, 0.1)',
+              fill: true,
+              tension: 0.3,
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#059669'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#0f172a', font: { family: "'Plus Jakarta Sans', sans-serif", weight: 600 } }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(0, 0, 0, 0.05)' },
+              ticks: { color: '#334155', font: { family: "'JetBrains Mono', monospace", weight: 600 } }
+            },
+            y: {
+              grid: { color: 'rgba(0, 0, 0, 0.05)' },
+              ticks: {
+                color: '#334155',
+                font: { family: "'JetBrains Mono', monospace", weight: 600 },
+                callback: v => formatTokens(v)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function drawModelBarChart(modelDist) {
+      const canvas = document.getElementById('canvas-model-chart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (chartModelObj) chartModelObj.destroy();
+
+      const labels = Object.keys(modelDist);
+      const values = Object.values(modelDist);
+      const badgeTotal = document.getElementById('badge-total-models');
+      if (badgeTotal) badgeTotal.innerText = `${labels.length} Models`;
+
+      chartModelObj = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['Trống'],
+          datasets: [{
+            label: 'Tổng Tokens',
+            data: values.length ? values : [0],
+            backgroundColor: [
+              '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0284c7'
+            ],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#0f172a', font: { family: "'JetBrains Mono', monospace", weight: 600 } }
+            },
+            y: {
+              grid: { color: 'rgba(0,0,0,0.05)' },
+              ticks: { color: '#334155', callback: v => formatTokens(v), font: { weight: 600 } }
+            }
+          }
+        }
+      });
+    }
+
+    function drawAccountDonutChart(accDist) {
+      const canvas = document.getElementById('canvas-account-chart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (chartAccountObj) chartAccountObj.destroy();
+
+      const labels = Object.keys(accDist).map(l => l.length > 20 ? l.slice(0, 18) + '...' : l);
+      const values = Object.values(accDist);
+      const badgeAcc = document.getElementById('badge-total-accounts');
+      if (badgeAcc) badgeAcc.innerText = `${labels.length} Cổng`;
+
+      chartAccountObj = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length ? labels : ['Trống'],
+          datasets: [{
+            data: values.length ? values : [1],
+            backgroundColor: [
+              '#059669', '#2563eb', '#7c3aed', '#d97706', '#3b82f6'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: '#0f172a', font: { family: "'Plus Jakarta Sans', sans-serif", weight: 600 } }
+            }
+          }
+        }
+      });
+    }
+
     async function fetchAnalyticsData() {
       try {
         const res = await fetch('/api/usage/realtime?timeframe=' + selectedTimeframe);
@@ -3286,9 +3642,7 @@ curl http://localhost:1909/v1/chat/completions \
           }
         }
 
-        drawTimelineChart(data.timeSeries || []);
-        drawModelDonut(data.tokensByModel || {});
-        drawAccountBar(data.tokensByAccount || {});
+        loadDetailedAnalytics();
       } catch (_) {}
     }
 

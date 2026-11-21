@@ -101,6 +101,123 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     res.json(usageTracker.getStats(ms));
   });
 
+  // Analytics summary grouped by day, month, year, or model
+  app.get('/api/analytics/summary', (req: Request, res: Response) => {
+    try {
+      const period = (req.query.period as string) || 'day'; // 'day' | 'month' | 'year' | 'hour'
+      const sqlite = manager.getStorage().getSqlite();
+      const allLogs = sqlite.getUsageLogs(100000);
+
+      // Phân nhóm theo period
+      const timelineMap: Record<string, { prompt: number; completion: number; total: number; requests: number }> = {};
+      const modelMap: Record<string, number> = {};
+      const accountMap: Record<string, number> = {};
+
+      const now = new Date();
+
+      allLogs.forEach((log) => {
+        const d = new Date(log.timestamp);
+        let key = '';
+
+        if (period === 'year') {
+          key = `${d.getFullYear()}`;
+        } else if (period === 'month') {
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          key = `${d.getFullYear()}-${m}`;
+        } else if (period === 'hour') {
+          const h = String(d.getHours()).padStart(2, '0');
+          key = `${h}:00`;
+        } else {
+          // 'day'
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          key = `${d.getFullYear()}-${m}-${day}`;
+        }
+
+        if (!timelineMap[key]) {
+          timelineMap[key] = { prompt: 0, completion: 0, total: 0, requests: 0 };
+        }
+        timelineMap[key].prompt += log.promptTokens || 0;
+        timelineMap[key].completion += log.completionTokens || 0;
+        timelineMap[key].total += log.totalTokens || 0;
+        timelineMap[key].requests += 1;
+
+        // Model Map
+        const modelName = log.model || 'unknown';
+        modelMap[modelName] = (modelMap[modelName] || 0) + (log.totalTokens || 0);
+
+        // Account Map
+        const accName = log.profile || 'unknown';
+        accountMap[accName] = (accountMap[accName] || 0) + (log.totalTokens || 0);
+      });
+
+      // Sắp xếp timeline theo thứ tự thời gian
+      const timelineKeys = Object.keys(timelineMap).sort();
+      const timeline = timelineKeys.map((k) => ({
+        label: k,
+        prompt: timelineMap[k].prompt,
+        completion: timelineMap[k].completion,
+        total: timelineMap[k].total,
+        requests: timelineMap[k].requests
+      }));
+
+      // Quota status ước tính cho từng model
+      const totalAllTokens = allLogs.reduce((acc, l) => acc + (l.totalTokens || 0), 0);
+      const activeProfiles = manager.listProfiles().filter(p => !p.isBlockedAntigravity);
+      const poolCapacity = Math.max(1, activeProfiles.length);
+
+      const quotaData = [
+        {
+          id: 'claude-3-7-sonnet',
+          name: 'Claude 3.7 Sonnet (Thinking)',
+          badge: 'ĐỈNH CAO CODE',
+          color: '#7C3AED',
+          dailyLimit: poolCapacity * 10000000, // 10M per account/day
+          usedToday: modelMap['claude-3-7-sonnet'] || modelMap['claude-sonnet-5-5-high'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 400000,
+          availableAccounts: poolCapacity,
+          status: 'healthy'
+        },
+        {
+          id: 'gemini-3.8-flash',
+          name: 'Gemini 3.8 Flash',
+          badge: 'SIÊU TỐC ĐỘ',
+          color: '#0284C7',
+          dailyLimit: poolCapacity * 50000000, // 50M per account/day
+          usedToday: modelMap['gemini-3.8-flash'] || modelMap['gemini-3.8-flash-high'] || 0,
+          rpmLimit: poolCapacity * 120,
+          tpmLimit: poolCapacity * 1000000,
+          availableAccounts: poolCapacity,
+          status: 'healthy'
+        },
+        {
+          id: 'gemini-4-argon',
+          name: 'Gemini 4 Argon / 2.5 Pro',
+          badge: 'TƯ DUY SÂU & 2M CONTEXT',
+          color: '#D97706',
+          dailyLimit: poolCapacity * 20000000, // 20M per account/day
+          usedToday: modelMap['gemini-4-argon'] || modelMap['gemini-2.5-pro'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 500000,
+          availableAccounts: poolCapacity,
+          status: 'healthy'
+        }
+      ];
+
+      res.json({
+        period,
+        totalAllTokens,
+        timeline,
+        modelDistribution: modelMap,
+        accountDistribution: accountMap,
+        quotas: quotaData
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Ping Google API for one or all profiles
   app.post('/api/ports/ping', async (req: Request, res: Response) => {
     try {
