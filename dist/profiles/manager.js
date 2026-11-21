@@ -350,9 +350,18 @@ class ProfileManager {
         }
         // Refresh if needed
         const updatedTokens = await this.oauthHandler.refreshTokenIfNeeded(prof.tokens);
+        let needSave = false;
         if (updatedTokens.access_token !== prof.tokens.access_token) {
             prof.tokens = updatedTokens;
             prof.updatedAt = Date.now();
+            needSave = true;
+        }
+        // Self-Healing: Nếu tài khoản từng bị gắn cờ isBlockedAntigravity nhưng có access token hợp lệ, tự động gỡ cờ chặn
+        if (prof.isBlockedAntigravity && updatedTokens.access_token) {
+            prof.isBlockedAntigravity = false;
+            needSave = true;
+        }
+        if (needSave) {
             data.profiles[name] = prof;
             this.storage.save(data);
         }
