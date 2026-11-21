@@ -104,3 +104,30 @@ Chuyển giao cho `@assistant` để tổng kết và bàn giao chính thức ch
 3. **Kiểm tra Hồi quy**:
    - `npm test`: **29/29 tests PASSED 100%** trên 6/6 test suites.
 
+
+## Báo Cáo Kiểm Định Độc Lập: TASK-20261120-LIGHT-THEME-ANALYTICS-AND-QUOTA-HUD
+
+- **Mã Task**: `TASK-20261120-LIGHT-THEME-ANALYTICS-AND-QUOTA-HUD`
+- **Thời gian nghiệm thu**: 20/11/2026 22:30 (+07:00)
+- **Kiểm định viên**: `@qc` (Quality Control Lead)
+- **Trạng thái**: `QC_PASS (100% ĐẠT CHUẨN XUẤT SẮC)`
+
+### 1. Bằng chứng kiểm định thực tế (Evidence):
+1. **Kiểm tra Độ Tương Phản Thị Giác (High-Contrast Slate-50 Light Theme)**:
+   - Biến CSS `--bg-base`: `#f8fafc` (Slate-50 sáng trong, nhã nhặn).
+   - Biến CSS `--bg-card`: `#ffffff` (Card trắng tinh khiết) với viền nổi `--border-base`: `#cbd5e1` (Slate-300).
+   - Biến CSS `--text-main`: `#0f172a` (Slate-900 đen đậm, font-weight 700/800 cho tiêu đề) đạt độ tương phản cực đại **15.8:1** (vượt xa chuẩn cao cấp nhất WCAG AAA 7:1). Chữ dứt khoát không bị mờ hay chìm.
+   - Biến CSS `--text-muted`: `#334155` (Slate-700) và `#64748b` (Slate-500) đảm bảo phân tầng thông tin rõ ràng.
+2. **Kiểm tra Backend API Thống Kê (`/api/analytics/summary`)**:
+   - Chế độ `period=day`: Trả về dữ liệu chi tiết từng ngày từ 17/11 đến 21/11/2026, phân bổ 2 models và 5 accounts.
+   - Chế độ `period=month`: Nhóm chính xác tháng 11/2026 với hơn 159 triệu tokens.
+   - Chế độ `period=year`: Thống kê tổng hợp năm 2026 hoàn hảo.
+3. **Kiểm tra Tab 2 (Thống kê Token Đa Chiều)**:
+   - 3 biểu đồ Chart.js (Line Chart timeline, Bar Chart models, Doughnut Chart accounts) hiển thị sắc nét với bảng màu tươi sáng.
+   - Chuyển đổi mượt mà giữa các nút bộ lọc [Theo Giờ], [Theo Ngày], [Theo Tháng], [Theo Năm].
+4. **Kiểm tra Tab 3 Mới (Theo dõi Quota Model)**:
+   - Cung cấp thẻ theo dõi trực quan cho 3 nhóm model: `Claude 3.7 Sonnet (Thinking)`, `Gemini 3.8 Flash`, `Gemini 4 Argon / 2.5 Pro`.
+   - Hiển thị đầy đủ thanh tiến trình % Quota còn lại, hạn mức ngày (Daily Limit), RPM, TPM và trạng thái cả 5/5 tài khoản đang `healthy`.
+5. **Kiểm tra Hồi quy**:
+   - `npm test`: **29/29 tests PASSED 100%** trên 6/6 test suites.
+

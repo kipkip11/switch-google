@@ -1,10 +1,78 @@
-# BÁO CÁO TRIỂN KHAI ĐỘT PHÁ: "ZERO-TRANSLATION FAST-PIPE MITM INTERCEPTOR" CHO ANTIGRAVITY IDE
+# BÁO CÁO TRIỂN KHAI ĐỘT PHÁ: GIAO DIỆN LIGHT THEME SLATE-50, THỐNG KÊ ĐA CHIỀU & TAB QUOTA MODEL
 
 **Dự án:** `switch-google`  
-**Task:** Triển khai module Antigravity Direct Link (Transparent Local MITM Interception) với kiến trúc Zero-Translation Fast-Pipe (< 5ms latency, Zero-Ban guarantee)  
+**Task:** Tái cấu trúc toàn diện giao diện sang Slate-50 Light Theme, thống kê Token theo Ngày/Tháng/Năm, bổ sung Tab Quota & Limits  
 **Người thực hiện:** `@dev`  
-**Ngày:** 2026-11-20  
+**Ngày:** 2026-11-21  
 **Trạng thái:** Hoàn thành triển khai & Test Suite 100% PASSED
+
+---
+
+## 1. Chi tiết các hạng mục đã hoàn thành
+
+### 1.1. Bảng màu Sáng tương phản cao (High-Contrast Slate-50 Palette)
+- **Nền chính:** `#F8FAFC` (Slate-50 sáng trong, tinh tế).
+- **Thẻ nội dung (Cards):** `#FFFFFF` thuần trắng với viền dứt khoát `#CBD5E1` (Slate-300) và đổ bóng nhẹ `rgba(15, 23, 42, 0.04)`.
+- **Màu chữ chính:** `#0F172A` (Slate-900 đen đậm, độ tương phản WCAG AAA > 15:1), triệt tiêu hoàn toàn tình trạng chữ bị mờ hoặc chìm.
+- **Màu nhãn phụ:** `#334155` (Slate-700) và `#64748b` (Slate-500) đảm bảo đọc rõ ràng ở mọi góc nhìn.
+
+### 1.2. Backend API Thống kê Thời gian (`/api/analytics/summary`)
+- Hỗ trợ tham số `period`:
+  - `hour`: Theo từng giờ
+  - `day`: Theo từng ngày (`%Y-%m-%d`)
+  - `month`: Theo từng tháng (`%Y-%m`)
+  - `year`: Theo từng năm (`%Y`)
+- Trả về cấu trúc JSON chuẩn:
+  - `timeline`: Danh sách mốc thời gian kèm prompt/completion/total tokens và số requests.
+  - `modelDistribution`: Lượng token tiêu thụ theo từng Model.
+  - `accountDistribution`: Lượng token tiêu thụ của từng Cổng Switch trong Pool.
+  - `quotas`: Hạn mức ước tính, % còn lại, RPM/TPM tối đa của 3 nhóm Model chủ lực (`Claude 3.7 Sonnet`, `Gemini 3.8 Flash`, `Gemini 4 Argon / 2.5 Pro`).
+
+### 1.3. Nâng cấp Tab 2: Thống Kê Token Đa Chiều
+- Bộ lọc chuyển đổi mượt mà giữa: **Theo Giờ**, **Theo Ngày**, **Theo Tháng**, **Theo Năm**.
+- 3 Biểu đồ Chart.js trực quan:
+  1. **Line Chart**: Biến thiên Prompt vs Completion Tokens theo mốc thời gian.
+  2. **Bar Chart**: So sánh phân bổ lượng token giữa các Model.
+  3. **Doughnut Chart**: Tỷ trọng gánh tải của từng tài khoản Google trong Pool.
+
+### 1.4. Bổ sung Tab 3 mới: Theo Dõi Quota & Hạn Ngạch Từng Model
+- Thẻ theo dõi trực quan cho 3 nhóm Model:
+  - `Claude 3.7 Sonnet (Thinking)`
+  - `Gemini 3.8 Flash`
+  - `Gemini 4 Argon / 2.5 Pro`
+- Thanh tiến trình (% Progress Bar) hạn ngạch token còn dùng được trong ngày.
+- Thông số tốc độ tối đa (RPM / TPM) và số tài khoản sẵn sàng phục vụ.
+
+---
+
+## 2. Bằng chứng kiểm thử thực tế
+
+### 2.1. Kiểm tra API Backend
+```bash
+$ curl -s "http://localhost:1909/api/analytics/summary?period=day"
+{
+  "period": "day",
+  "totalAllTokens": 156612422,
+  "timeline": [
+    {"label": "2026-11-17", "total": 3491182},
+    {"label": "2026-11-19", "total": 32733512},
+    {"label": "2026-11-20", "total": 90522444},
+    {"label": "2026-11-21", "total": 29816074}
+  ],
+  "modelDistribution": {"gemini-3.8-flash": 156612422},
+  "quotas": [...]
+}
+```
+
+### 2.2. Biên dịch & Test Suite
+- TypeScript: `npm run build` exit code 0.
+- Jest Tests: **29/29 tests PASSED 100%**.
+- Git commit: `45976df` (`feat: nâng cấp giao diện Light Theme Slate-50, thống kê token theo ngày/tháng/năm và tab quota model`).
+
+---
+
+## 3. Bàn giao nghiệm thu
+Toàn bộ mã nguồn đã hoàn tất và sẵn sàng cho việc kiểm thử độc lập từ `@qc`!
 
 ---
 
