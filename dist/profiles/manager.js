@@ -76,6 +76,15 @@ class ProfileManager {
     deleteCombo(id) {
         return this.storage.deleteCombo(id);
     }
+    setActiveModelInCombo(comboId, model) {
+        return this.storage.setActiveModelInCombo(comboId, model);
+    }
+    setSystemActiveCombo(comboId, active = true) {
+        return this.storage.setSystemActiveCombo(comboId, active);
+    }
+    getActiveSystemCombo() {
+        return this.storage.getActiveSystemCombo();
+    }
     listProfiles() {
         const data = this.storage.load();
         const result = [];
@@ -322,7 +331,7 @@ class ProfileManager {
         this.storage.save(data);
         return true;
     }
-    async getTokenForProfile(name) {
+    async getTokenForProfile(name, forceRefresh = false) {
         const data = this.storage.load();
         const prof = data.profiles[name];
         if (!prof) {
@@ -348,8 +357,8 @@ class ProfileManager {
                 expiry_date: null
             };
         }
-        // Refresh if needed
-        const updatedTokens = await this.oauthHandler.refreshTokenIfNeeded(prof.tokens);
+        // Refresh if needed or forced
+        const updatedTokens = await this.oauthHandler.refreshTokenIfNeeded(prof.tokens, forceRefresh);
         let needSave = false;
         if (updatedTokens.access_token !== prof.tokens.access_token) {
             prof.tokens = updatedTokens;

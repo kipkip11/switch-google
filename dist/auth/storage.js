@@ -178,6 +178,21 @@ class ProfileStorage {
             this.save(this.load());
         return res;
     }
+    setActiveModelInCombo(comboId, model) {
+        const res = this.sqlite.setActiveModelInCombo(comboId, model);
+        if (res)
+            this.save(this.load());
+        return res;
+    }
+    setSystemActiveCombo(comboId, active = true) {
+        const res = this.sqlite.setSystemActiveCombo(comboId, active);
+        if (res)
+            this.save(this.load());
+        return res;
+    }
+    getActiveSystemCombo() {
+        return this.sqlite.getActiveSystemCombo();
+    }
     getStorageDirectory() {
         return this.baseDir;
     }

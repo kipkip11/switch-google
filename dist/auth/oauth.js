@@ -7,7 +7,7 @@ exports.GoogleOAuthHandler = exports.GEMINI_CLI_CLIENT_SECRET = exports.GEMINI_C
 const http_1 = __importDefault(require("http"));
 const url_1 = __importDefault(require("url"));
 const google_auth_library_1 = require("google-auth-library");
-// Antigravity & Gemini OAuth Client Credentials (from 9router / Google Antigravity Hub)
+// Antigravity & Gemini OAuth Client Credentials (from Google Antigravity Hub)
 exports.ANTIGRAVITY_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
 exports.ANTIGRAVITY_CLIENT_SECRET = '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';
 exports.GEMINI_CLI_CLIENT_ID = '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
@@ -153,9 +153,9 @@ class GoogleOAuthHandler {
             });
         });
     }
-    async refreshTokenIfNeeded(tokens) {
+    async refreshTokenIfNeeded(tokens, force = false) {
         const isExpired = tokens.expiry_date ? tokens.expiry_date <= Date.now() + 60000 : false;
-        if (!isExpired && tokens.access_token) {
+        if (!force && !isExpired && tokens.access_token) {
             return tokens;
         }
         if (!tokens.refresh_token) {

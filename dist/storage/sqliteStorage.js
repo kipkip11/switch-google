@@ -137,13 +137,22 @@ class FallbackSqliteDb {
                     return { changes: 1 };
                 }
                 // Model Combos
+                if (s.startsWith('UPDATE model_combos SET is_active = 0')) {
+                    for (const c of Object.values(this.data.model_combos)) {
+                        c.is_active = 0;
+                    }
+                    this.persist();
+                    return { changes: Object.keys(this.data.model_combos).length };
+                }
                 if (s.startsWith('INSERT OR REPLACE INTO model_combos')) {
                     this.data.model_combos[args[0]] = {
                         id: args[0],
                         name: args[1],
                         strategy: args[2],
                         models_json: args[3],
-                        created_at: args[4]
+                        active_model: args[4] || null,
+                        is_active: args[5] ? 1 : 0,
+                        created_at: args[6] || Date.now()
                     };
                     this.persist();
                     return { changes: 1 };
@@ -447,9 +456,19 @@ class SqliteStorage {
         name TEXT UNIQUE,
         strategy TEXT,
         models_json TEXT,
+        active_model TEXT,
+        is_active INTEGER DEFAULT 0,
         created_at INTEGER
       );
     `);
+        try {
+            this.db.exec(`ALTER TABLE model_combos ADD COLUMN active_model TEXT;`);
+        }
+        catch (_) { }
+        try {
+            this.db.exec(`ALTER TABLE model_combos ADD COLUMN is_active INTEGER DEFAULT 0;`);
+        }
+        catch (_) { }
         // Tạo bảng settings
         this.db.exec(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -738,39 +757,52 @@ class SqliteStorage {
     // Model Combos
     getCombos() {
         const rows = this.db.prepare('SELECT * FROM model_combos ORDER BY created_at ASC').all();
-        return rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            strategy: r.strategy,
-            models: r.models_json ? JSON.parse(r.models_json) : [],
-            createdAt: r.created_at
-        }));
+        return rows.map((r) => {
+            const models = r.models_json ? JSON.parse(r.models_json) : [];
+            return {
+                id: r.id,
+                name: r.name,
+                strategy: r.strategy,
+                models,
+                activeModel: r.active_model || (models.length > 0 ? models[0] : undefined),
+                isActive: Boolean(r.is_active),
+                createdAt: r.created_at
+            };
+        });
     }
     getCombo(idOrName) {
         const r = this.db.prepare('SELECT * FROM model_combos WHERE id = ? OR name = ?').get(idOrName, idOrName);
         if (!r)
             return null;
+        const models = r.models_json ? JSON.parse(r.models_json) : [];
         return {
             id: r.id,
             name: r.name,
             strategy: r.strategy,
-            models: r.models_json ? JSON.parse(r.models_json) : [],
+            models,
+            activeModel: r.active_model || (models.length > 0 ? models[0] : undefined),
+            isActive: Boolean(r.is_active),
             createdAt: r.created_at
         };
     }
     saveCombo(combo) {
+        const activeModel = combo.activeModel || (combo.models && combo.models.length > 0 ? combo.models[0] : null);
+        const isActive = combo.isActive ? 1 : 0;
         this.db.prepare(`
-      INSERT OR REPLACE INTO model_combos (id, name, strategy, models_json, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(combo.id, combo.name, combo.strategy, JSON.stringify(combo.models || []), combo.createdAt);
+      INSERT OR REPLACE INTO model_combos (id, name, strategy, models_json, active_model, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(combo.id, combo.name, combo.strategy, JSON.stringify(combo.models || []), activeModel, isActive, combo.createdAt);
     }
     createCombo(name, strategy, models) {
         const existing = this.getCombo(name.trim());
+        const cleanModels = models.filter((m) => m && m.trim().length > 0);
         const combo = {
             id: existing ? existing.id : 'combo_' + Date.now().toString(36),
             name: name.trim(),
             strategy,
-            models: models.filter((m) => m && m.trim().length > 0),
+            models: cleanModels,
+            activeModel: cleanModels.length > 0 ? cleanModels[0] : undefined,
+            isActive: false,
             createdAt: existing ? existing.createdAt : Date.now()
         };
         this.saveCombo(combo);
@@ -787,8 +819,46 @@ class SqliteStorage {
         if (updates.models !== undefined) {
             combo.models = updates.models.filter((m) => m && m.trim().length > 0);
         }
+        if (updates.activeModel !== undefined)
+            combo.activeModel = updates.activeModel;
+        if (updates.isActive !== undefined)
+            combo.isActive = updates.isActive;
+        if (combo.activeModel && !combo.models.includes(combo.activeModel)) {
+            combo.activeModel = combo.models.length > 0 ? combo.models[0] : undefined;
+        }
         this.saveCombo(combo);
         return combo;
+    }
+    setActiveModelInCombo(comboId, model) {
+        const combo = this.getCombo(comboId);
+        if (!combo)
+            return null;
+        const cleanModel = model.trim();
+        if (!combo.models.includes(cleanModel)) {
+            combo.models.push(cleanModel);
+        }
+        combo.activeModel = cleanModel;
+        this.saveCombo(combo);
+        return combo;
+    }
+    setSystemActiveCombo(comboId, active = true) {
+        const combo = this.getCombo(comboId);
+        if (!combo)
+            return null;
+        if (active) {
+            try {
+                this.db.prepare('UPDATE model_combos SET is_active = 0').run();
+            }
+            catch (_) { }
+        }
+        combo.isActive = active;
+        this.saveCombo(combo);
+        return combo;
+    }
+    getActiveSystemCombo() {
+        const combos = this.getCombos();
+        const active = combos.find((c) => c.isActive);
+        return active || null;
     }
     addModelToCombo(comboId, model) {
         const combo = this.getCombo(comboId);

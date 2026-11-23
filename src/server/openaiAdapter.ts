@@ -5,6 +5,8 @@ import { AccountRotator } from '../profiles/rotator';
 import { generateContentGeminiWeb } from '../services/geminiWebClient';
 import { cleanJSONSchemaForAntigravity } from './schemaCleaner';
 import { usageTracker } from '../usage/tracker';
+import { ModelFallbackManager } from '../services/modelFallback';
+import { ExternalProviderManager } from '../services/externalProviders';
 
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding. You are pair programming with a USER to solve their coding task.';
@@ -122,96 +124,53 @@ async function callUpstreamGoogle(creds: any, actualModel: string, geminiBody: a
     return res;
   }
 
-  if (isAntigravityToken) {
-    try {
-      const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-      const activityId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-      const clientRequestId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-      const headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
-        'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
-        'x-activity-request-id': activityId,
-        'Authorization': `Bearer ${creds.access_token}`
-      };
-      const requestPayload = {
-        project: 'aicode-consumers',
-        model: actualModel,
-        requestId: clientRequestId,
-        userAgent: 'antigravity',
-        request: geminiBody
-      };
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestPayload)
-      });
-      if (res.ok) return res;
-      if (res.status !== 403 && res.status !== 401) {
-        const errText = await res.text();
-        const err: any = new Error(errText);
-        err.status = res.status;
-        throw err;
-      }
-    } catch (err: any) {
-      if (err.status && err.status !== 403 && err.status !== 401) {
-        throw err;
-      }
-      // Tiếp tục fallback sang generativelanguage bên dưới nếu bị 401/403
-    }
-  }
+  // Tài khoản OAuth hoặc Antigravity Token: Gửi thẳng tới Google Cloud Code endpoint
+  const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+  const activityId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const clientRequestId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const headers = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
+    'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
+    'x-activity-request-id': activityId,
+    'Authorization': `Bearer ${creds.access_token}`
+  };
+  const requestPayload = {
+    project: 'aicode-consumers',
+    model: actualModel,
+    requestId: clientRequestId,
+    userAgent: 'antigravity',
+    request: geminiBody
+  };
 
-  // OAuth Account hoặc Antigravity Token: thử daily-cloudcode-pa trước, nếu bị chặn 403 (TOS_VIOLATION) hoặc 401 thì tự động chuyển sang generativelanguage
-  if (!isAntigravityToken) {
-    try {
-      const apiUrl = `https://daily-cloudcode-pa.googleapis.com/v1internal:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-      const activityId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-      const clientRequestId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-      const headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'antigravity/cli/1.3.3 (aidev_client; os_type=darwin; arch=arm64; cl=996823801; auth_method=consumer)',
-        'X-Goog-Api-Client': 'gl-go/1.22.0 gdcl/0.180.0',
-        'x-activity-request-id': activityId,
-        'Authorization': `Bearer ${creds.access_token}`
-      };
-      const requestPayload = {
-        project: 'aicode-consumers',
-        model: actualModel,
-        requestId: clientRequestId,
-        userAgent: 'antigravity',
-        request: geminiBody
-      };
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestPayload)
-      });
-      if (res.ok) return res;
-      // Bất kể mã lỗi gì từ cloudcode (403 TOS_VIOLATION, 401, 429), chuyển tiếp sang generativelanguage
-      console.warn(`[OAuth Fallback] Tài khoản [${creds.profile}] bị CloudCode từ chối (${res.status}). Đang tự động chuyển tiếp sang Generative Language API...`);
-    } catch (err: any) {
-      console.warn(`[OAuth Fallback] Lỗi kết nối CloudCode cho [${creds.profile}]: ${err.message}. Tự động fallback sang Generative Language...`);
-    }
-  }
-
-  // Tự động gọi generativelanguage bằng OAuth Bearer token
-  const glModel = resolveGenerativeLanguageModel(actualModel);
-  const glUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
-  const glRes = await fetch(glUrl, {
+  const res = await fetch(apiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${creds.access_token}`
-    },
-    body: JSON.stringify(geminiBody)
+    headers,
+    body: JSON.stringify(requestPayload)
   });
-  if (!glRes.ok) {
-    const errText = await glRes.text();
-    const err: any = new Error(errText);
-    err.status = glRes.status;
-    throw err;
+
+  if (res.ok) return res;
+
+  const errText = await res.text();
+
+  // Chỉ fallback sang Generative Language API nếu tài khoản thực sự có Gemini API key
+  if (creds.apiKey) {
+    try {
+      const glModel = resolveGenerativeLanguageModel(actualModel);
+      const glUrl = `https://generativelanguage.googleapis.com/v1beta/models/${glModel}:${stream ? 'streamGenerateContent?alt=sse&key=' : 'generateContent?key='}${creds.apiKey}`;
+      const glRes = await fetch(glUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody)
+      });
+      if (glRes.ok) return glRes;
+    } catch (_) {}
   }
-  return glRes;
+
+  // Quăng lỗi trung thực từ Google CloudCode (401 token hết hạn, 429 quota, 403 TOS)
+  const err: any = new Error(errText);
+  err.status = res.status;
+  throw err;
 }
 
 /**
@@ -491,17 +450,26 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
 
       // Check if requested model is a Model Combo
       const combos = manager.getCombos();
-      const combo = combos.find((c) => c.name.toLowerCase() === model.toLowerCase());
+      let combo = combos.find((c) => c.name.toLowerCase() === model.toLowerCase());
+      if (!combo && (model === 'default' || model === 'auto')) {
+        combo = manager.getActiveSystemCombo() || undefined;
+      }
 
       let modelCandidates: string[] = [];
       if (combo && combo.models.length > 0) {
-        modelCandidates = [...combo.models];
+        const chosen = combo.activeModel || combo.models[0];
+        const remaining = combo.models.filter((m) => m !== chosen);
         if (combo.strategy === 'round-robin') {
+          modelCandidates = [...combo.models];
           const first = modelCandidates.shift()!;
           modelCandidates.push(first);
+        } else {
+          // Luôn ưu tiên model được chọn trong combo trước, sau đó là các model dự phòng còn lại
+          modelCandidates = [chosen, ...remaining];
         }
       } else {
-        modelCandidates = [model];
+        const fallbackMgr = new ModelFallbackManager(manager);
+        modelCandidates = fallbackMgr.getFallbackChain(model);
       }
 
       // Convert messages (including tool calls & function results) to Gemini format
@@ -840,11 +808,66 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
         } catch (err: any) {
           lastError = err;
           rotator.clearCooldowns();
-          console.warn(`[Failover] Model [${targetModel}] gặp lỗi: ${err.message}. Tiếp tục thử...`);
+          console.warn(`[Failover] Model [${targetModel}] gặp lỗi hoặc cạn quota: ${err.message}. Tiếp tục thử model dự phòng...`);
         }
       }
 
-      throw lastError || new Error('All model candidates failed.');
+      // Multi-Provider Cascading Fallback (khi toàn bộ pool Google cạn quota)
+      const sqlite = manager.getStorage().getSqlite();
+      const fallbackProvider = ExternalProviderManager.getActiveFallbackProvider(sqlite);
+      if (fallbackProvider) {
+        console.log(`[Failover] Chuyển mạch sang Provider dự phòng: ${fallbackProvider.name} (${fallbackProvider.baseUrl})`);
+        try {
+          const upstreamHeaders: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          if (fallbackProvider.apiKey) {
+            upstreamHeaders['Authorization'] = `Bearer ${fallbackProvider.apiKey}`;
+          }
+
+          const fallbackBody = {
+            ...req.body,
+            model: fallbackProvider.models[0] || model
+          };
+
+          const proxyRes = await fetch(`${fallbackProvider.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: upstreamHeaders,
+            body: JSON.stringify(fallbackBody)
+          });
+
+          if (!proxyRes.ok) {
+            const errText = await proxyRes.text();
+            throw new Error(`Provider ${fallbackProvider.name} error: ${proxyRes.status} ${errText}`);
+          }
+
+          if (stream) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Fallback-Provider', fallbackProvider.name);
+            if (proxyRes.body) {
+              const reader = (proxyRes.body as any).getReader();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(value);
+              }
+              res.end();
+            }
+            return;
+          } else {
+            const data = await proxyRes.json();
+            res.setHeader('X-Fallback-Provider', fallbackProvider.name);
+            res.json(data);
+            return;
+          }
+        } catch (provErr: any) {
+          console.error(`[Failover] Lỗi khi gọi ${fallbackProvider.name}:`, provErr.message);
+        }
+      }
+
+      throw lastError || new Error('All model candidates and fallback providers failed.');
     } catch (err: any) {
       const errMsg = err.message || 'Internal Server Error';
       const isNoAccount = errMsg.includes('Chưa có tài khoản nào') || errMsg.includes('Tất cả tài khoản trong pool');

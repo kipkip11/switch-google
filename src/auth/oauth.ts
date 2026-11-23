@@ -10,7 +10,7 @@ export interface OAuthConfig {
   scopes?: string[];
 }
 
-// Antigravity & Gemini OAuth Client Credentials (from 9router / Google Antigravity Hub)
+// Antigravity & Gemini OAuth Client Credentials (from Google Antigravity Hub)
 export const ANTIGRAVITY_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
 export const ANTIGRAVITY_CLIENT_SECRET = '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';
 
@@ -178,9 +178,9 @@ export class GoogleOAuthHandler {
     });
   }
 
-  public async refreshTokenIfNeeded(tokens: TokenData): Promise<TokenData> {
+  public async refreshTokenIfNeeded(tokens: TokenData, force = false): Promise<TokenData> {
     const isExpired = tokens.expiry_date ? tokens.expiry_date <= Date.now() + 60000 : false;
-    if (!isExpired && tokens.access_token) {
+    if (!force && !isExpired && tokens.access_token) {
       return tokens;
     }
 

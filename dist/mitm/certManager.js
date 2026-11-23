@@ -53,11 +53,64 @@ class CertManager {
         if (!fs.existsSync(this.certsDir)) {
             fs.mkdirSync(this.certsDir, { recursive: true, mode: 0o700 });
         }
-        if (!fs.existsSync(this.caKeyPath) || !fs.existsSync(this.caCertPath)) {
-            // Sinh root CA dùng OpenSSL có sẵn trên hệ thống (macOS / Linux / Windows)
-            (0, child_process_1.execSync)(`openssl req -x509 -newkey rsa:2048 -nodes -keyout "${this.caKeyPath}" -out "${this.caCertPath}" -days 3650 -subj "/CN=Switch Google Root CA/O=SwitchGoogle/OU=LocalProxy"`, { stdio: 'pipe' });
-            fs.chmodSync(this.caKeyPath, 0o600);
-            fs.chmodSync(this.caCertPath, 0o644);
+        let needGenerateCA = !fs.existsSync(this.caKeyPath) || !fs.existsSync(this.caCertPath);
+        // Kiểm tra tính hợp lệ của Root CA: Bắt buộc phải là chuẩn X509v3 với basicConstraints CA:TRUE
+        // để tương thích tuyệt đối với Go crypto/x509 trên Antigravity IDE
+        if (!needGenerateCA) {
+            try {
+                const certText = (0, child_process_1.execSync)(`openssl x509 -text -noout -in "${this.caCertPath}"`, {
+                    encoding: 'utf8',
+                    stdio: ['pipe', 'pipe', 'ignore']
+                });
+                if (!certText.includes('CA:TRUE') || !certText.includes('Certificate Sign')) {
+                    console.warn('[CertManager] Phát hiện Root CA cũ là X509v1 hoặc thiếu basicConstraints CA:TRUE. Đang tự động tái tạo chuẩn X509v3...');
+                    needGenerateCA = true;
+                    if (fs.existsSync(this.caKeyPath))
+                        fs.unlinkSync(this.caKeyPath);
+                    if (fs.existsSync(this.caCertPath))
+                        fs.unlinkSync(this.caCertPath);
+                    // Xóa bỏ các domain cert cũ đã ký bởi CA cũ để đảm bảo tính nhất quán chuỗi chứng chỉ
+                    if (fs.existsSync(this.certsDir)) {
+                        fs.rmSync(this.certsDir, { recursive: true, force: true });
+                        fs.mkdirSync(this.certsDir, { recursive: true, mode: 0o700 });
+                    }
+                }
+            }
+            catch {
+                needGenerateCA = true;
+            }
+        }
+        if (needGenerateCA) {
+            const caCnfPath = path.join(this.mitmDir, 'rootCA.cnf');
+            const caCnfContent = `
+[ req ]
+distinguished_name = req_dn
+x509_extensions = v3_ca
+prompt = no
+
+[ req_dn ]
+CN = Switch Google Root CA
+O = SwitchGoogle
+OU = LocalProxy
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+`;
+            fs.writeFileSync(caCnfPath, caCnfContent);
+            try {
+                // Sinh Root CA chuẩn X509v3 với CA:TRUE và keyCertSign (chuẩn RFC 5280)
+                (0, child_process_1.execSync)(`openssl req -x509 -new -newkey rsa:2048 -nodes -keyout "${this.caKeyPath}" -out "${this.caCertPath}" -days 3650 -config "${caCnfPath}" -extensions v3_ca`, { stdio: 'pipe' });
+                fs.chmodSync(this.caKeyPath, 0o600);
+                fs.chmodSync(this.caCertPath, 0o644);
+            }
+            finally {
+                if (fs.existsSync(caCnfPath)) {
+                    fs.unlinkSync(caCnfPath);
+                }
+            }
         }
         return {
             key: fs.readFileSync(this.caKeyPath),
@@ -118,11 +171,12 @@ IP.1 = 127.0.0.1
         }
         return fs.existsSync(this.caCertPath);
     }
-    static getTrustCommand() {
-        if (process.platform === 'darwin') {
-            return `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${this.caCertPath}"`;
+    static getTrustCommand(platformOverride) {
+        const platform = platformOverride || process.platform;
+        if (platform === 'darwin') {
+            return `sudo security delete-certificate -c "Switch Google Root CA" /Library/Keychains/System.keychain 2>/dev/null || true; sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${this.caCertPath}"`;
         }
-        if (process.platform === 'linux') {
+        if (platform === 'linux') {
             return `sudo cp "${this.caCertPath}" /usr/local/share/ca-certificates/switch-google.crt && sudo update-ca-certificates`;
         }
         return `certutil -addstore -f "ROOT" "${this.caCertPath}"`;

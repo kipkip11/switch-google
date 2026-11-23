@@ -179,4 +179,40 @@ describe('AccountRotator', () => {
     const res = await rotator.autoRecoverBlockedAccounts();
     expect(res.triggered).toContain('blocked-oauth-2');
   });
+
+  test('should unban all accounts and clear cooldowns with unbanAllAccounts', () => {
+    rotator.markBanned('acc1');
+    rotator.markBanned('acc2');
+    rotator.markCooldown('acc3', 100);
+
+    let ports = rotator.getPortStatuses();
+    expect(ports.find(p => p.profile === 'acc1')!.linkStatus).toBe('banned');
+    expect(ports.find(p => p.profile === 'acc2')!.linkStatus).toBe('banned');
+    expect(ports.find(p => p.profile === 'acc3')!.linkStatus).toBe('cooldown');
+
+    const result = rotator.unbanAllAccounts();
+    expect(result.unbanned).toHaveLength(3);
+
+    ports = rotator.getPortStatuses();
+    expect(ports.find(p => p.profile === 'acc1')!.linkStatus).toBe('up');
+    expect(ports.find(p => p.profile === 'acc2')!.linkStatus).toBe('up');
+    expect(ports.find(p => p.profile === 'acc3')!.linkStatus).toBe('up');
+  });
+
+  test('SUBSCRIPTION_REQUIRED error should NOT ban the account', async () => {
+    let callCount = 0;
+    try {
+      await rotator.executeWithFailover(async (creds) => {
+        callCount++;
+        throw new Error('403 Forbidden: SUBSCRIPTION_REQUIRED');
+      });
+    } catch (_) {}
+
+    const ports = rotator.getPortStatuses();
+    const testedAccount = ports.find(p => p.profile === 'acc1')!;
+    // Should NOT be banned
+    expect(testedAccount.linkStatus).not.toBe('banned');
+    // Should only be in cooldown
+    expect(testedAccount.linkStatus).toBe('cooldown');
+  });
 });

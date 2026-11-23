@@ -65,6 +65,18 @@ export class ProfileManager {
     return this.storage.deleteCombo(id);
   }
 
+  public setActiveModelInCombo(comboId: string, model: string): ModelCombo | null {
+    return this.storage.setActiveModelInCombo(comboId, model);
+  }
+
+  public setSystemActiveCombo(comboId: string, active = true): ModelCombo | null {
+    return this.storage.setSystemActiveCombo(comboId, active);
+  }
+
+  public getActiveSystemCombo(): ModelCombo | null {
+    return this.storage.getActiveSystemCombo();
+  }
+
   public listProfiles(): ProfileSummary[] {
     const data = this.storage.load();
     const result: ProfileSummary[] = [];
@@ -340,7 +352,7 @@ export class ProfileManager {
     return true;
   }
 
-  public async getTokenForProfile(name: string): Promise<{
+  public async getTokenForProfile(name: string, forceRefresh = false): Promise<{
     profile: string;
     email: string;
     type?: ProfileType;
@@ -376,8 +388,8 @@ export class ProfileManager {
       } as any;
     }
 
-    // Refresh if needed
-    const updatedTokens = await this.oauthHandler.refreshTokenIfNeeded(prof.tokens);
+    // Refresh if needed or forced
+    const updatedTokens = await this.oauthHandler.refreshTokenIfNeeded(prof.tokens, forceRefresh);
     let needSave = false;
     if (updatedTokens.access_token !== prof.tokens.access_token) {
       prof.tokens = updatedTokens;

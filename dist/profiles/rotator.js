@@ -250,6 +250,22 @@ class AccountRotator {
             s.cooldownUntil = 0;
         }
     }
+    unbanAllAccounts() {
+        const unbanned = [];
+        const profiles = this.manager.listProfiles();
+        for (const p of profiles) {
+            const s = this.stats.get(p.name);
+            if (s) {
+                s.isBanned = false;
+                s.cooldownUntil = 0;
+                s.failedRequests = 0;
+            }
+            this.manager.setBlockedAntigravity(p.name, false);
+            unbanned.push(p.name);
+        }
+        console.log(`[Rotator] ✓ Đã khôi phục toàn bộ cổng (${unbanned.length} tài khoản). Tất cả tài khoản đã sẵn sàng.`);
+        return { unbanned };
+    }
     async getAvailableAccounts() {
         const profiles = this.manager.listProfiles();
         const now = Date.now();
@@ -387,14 +403,23 @@ class AccountRotator {
                 const isBannedIssue = errMsg.includes('TOS_VIOLATION') ||
                     errMsg.includes('VALIDATION_REQUIRED') ||
                     errMsg.includes('Terms of Service') ||
-                    errMsg.includes('SUBSCRIPTION_REQUIRED') ||
-                    (err.status === 403 && errMsg.includes('PERMISSION_DENIED'));
+                    errMsg.includes('ACCOUNT_SUSPENDED');
                 if (isBannedIssue) {
                     this.markBanned(creds.profile);
                     this.manager.setBlockedAntigravity(creds.profile, true);
                     if (creds.type === 'oauth') {
                         this.triggerAutoUpgradeToWeb(creds.profile);
                     }
+                }
+                else if (err.status === 401 || errMsg.includes('UNAUTHENTICATED') || errMsg.includes('ACCESS_TOKEN_EXPIRED')) {
+                    console.warn(`[Failover] Tài khoản [${creds.profile}] gặp lỗi 401/Expired. Kích hoạt làm mới token...`);
+                    try {
+                        await this.manager.getTokenForProfile(creds.profile, true);
+                    }
+                    catch (refErr) {
+                        console.warn(`[Failover] Không thể tự động làm mới token cho [${creds.profile}]: ${refErr.message}`);
+                    }
+                    this.markCooldown(creds.profile, 30);
                 }
                 else {
                     const cooldownTime = err.status === 429 ? 60 : 20;

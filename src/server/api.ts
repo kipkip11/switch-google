@@ -10,12 +10,53 @@ import { autoCaptureGeminiWebSession } from '../services/webAuthAutomator';
 import { MitmServer } from '../mitm/mitmServer';
 import { CertManager } from '../mitm/certManager';
 import { DnsManager } from '../mitm/dnsManager';
+import { PortForwardManager } from '../mitm/portForwardManager';
+import { ModelFallbackManager, DEFAULT_MODEL_FALLBACKS } from '../services/modelFallback';
+import { ExternalProviderManager } from '../services/externalProviders';
+import { Agent, setGlobalDispatcher } from 'undici';
+import dns from 'dns';
+
+// Bỏ qua /etc/hosts cho các request nội bộ từ switch-google tới Google APIs để triệt tiêu loopback khi Direct Link kích hoạt
+function setupUpstreamDirectDns(): void {
+  try {
+    const resolver = new dns.Resolver();
+    resolver.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+    const upstreamAgent = new Agent({
+      connect: {
+        lookup: (hostname, opts, cb) => {
+          const callback = typeof opts === 'function' ? opts : cb;
+          const isAll = typeof opts === 'object' && opts && (opts as any).all;
+          if (hostname.includes('googleapis.com')) {
+            resolver.resolve4(hostname, (err, addrs) => {
+              if (err || !addrs || addrs.length === 0) {
+                return dns.lookup(hostname, opts as any, callback as any);
+              }
+              const ip = addrs[Math.floor(Math.random() * addrs.length)];
+              if (isAll) {
+                callback(null, [{ address: ip, family: 4 }]);
+              } else {
+                callback(null, ip, 4);
+              }
+            });
+          } else {
+            dns.lookup(hostname, opts as any, callback as any);
+          }
+        }
+      }
+    });
+    setGlobalDispatcher(upstreamAgent);
+  } catch (e: any) {
+    console.warn('[DirectDNS] Warning: Could not set global undici dispatcher:', e.message);
+  }
+}
 
 export function startApiServer(port = Number(process.env.PORT) || 1909): void {
+  setupUpstreamDirectDns();
   const app = express();
   const manager = new ProfileManager();
   const rotator = new AccountRotator(manager);
   const daemon = new DaemonManager();
+  const fallbackMgr = new ModelFallbackManager(manager);
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -75,6 +116,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       accountStats: rotator.getStats(),
       ports,
       serving: rotator.getCurrentlyServing(),
+      autoModelFallback: fallbackMgr.isAutoFallbackEnabled(),
       liveTraffic,
       latestModel,
       usageStats,
@@ -112,6 +154,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       const timelineMap: Record<string, { prompt: number; completion: number; total: number; requests: number }> = {};
       const modelMap: Record<string, number> = {};
       const accountMap: Record<string, number> = {};
+      const modelAccountMap: Record<string, Record<string, { totalTokens: number; requests: number }>> = {};
 
       const now = new Date();
 
@@ -149,6 +192,16 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         // Account Map
         const accName = log.profile || 'unknown';
         accountMap[accName] = (accountMap[accName] || 0) + (log.totalTokens || 0);
+
+        // Model x Account Map
+        if (!modelAccountMap[modelName]) {
+          modelAccountMap[modelName] = {};
+        }
+        if (!modelAccountMap[modelName][accName]) {
+          modelAccountMap[modelName][accName] = { totalTokens: 0, requests: 0 };
+        }
+        modelAccountMap[modelName][accName].totalTokens += log.totalTokens || 0;
+        modelAccountMap[modelName][accName].requests += 1;
       });
 
       // Sắp xếp timeline theo thứ tự thời gian
@@ -165,6 +218,43 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       const totalAllTokens = allLogs.reduce((acc, l) => acc + (l.totalTokens || 0), 0);
       const activeProfiles = manager.listProfiles().filter(p => !p.isBlockedAntigravity);
       const poolCapacity = Math.max(1, activeProfiles.length);
+      const portStatuses = rotator.getPortStatuses();
+
+      const getAccountsForModel = (modelKeys: string[], singleLimit: number) => {
+        return portStatuses.map((p) => {
+          let usedTokens = 0;
+          let requests = 0;
+          for (const mk of modelKeys) {
+            if (modelAccountMap[mk]) {
+              const stat1 = modelAccountMap[mk][p.profile];
+              const stat2 = p.email ? modelAccountMap[mk][p.email] : null;
+              if (stat1) {
+                usedTokens += stat1.totalTokens;
+                requests += stat1.requests;
+              } else if (stat2) {
+                usedTokens += stat2.totalTokens;
+                requests += stat2.requests;
+              }
+            }
+          }
+          const remainingTokens = Math.max(0, singleLimit - usedTokens);
+          const pctRemaining = Math.max(0, Math.min(100, 100 - Math.round((usedTokens / singleLimit) * 100)));
+          return {
+            portNumber: p.portNumber,
+            profile: p.profile,
+            email: p.email,
+            type: p.type,
+            linkStatus: p.linkStatus,
+            cooldownRemainingSeconds: p.cooldownRemainingSeconds,
+            isServingNow: p.isServingNow,
+            usedTokens,
+            requests,
+            limitTokens: singleLimit,
+            remainingTokens,
+            pctRemaining
+          };
+        });
+      };
 
       const quotaData = [
         {
@@ -177,7 +267,8 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
           rpmLimit: poolCapacity * 60,
           tpmLimit: poolCapacity * 400000,
           availableAccounts: poolCapacity,
-          status: 'healthy'
+          status: 'healthy',
+          accounts: getAccountsForModel(['claude-3-7-sonnet', 'claude-sonnet-5-5-high'], 10000000)
         },
         {
           id: 'gemini-3.8-flash',
@@ -189,7 +280,8 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
           rpmLimit: poolCapacity * 120,
           tpmLimit: poolCapacity * 1000000,
           availableAccounts: poolCapacity,
-          status: 'healthy'
+          status: 'healthy',
+          accounts: getAccountsForModel(['gemini-3.8-flash', 'gemini-3.8-flash-high'], 50000000)
         },
         {
           id: 'gemini-4-argon',
@@ -197,11 +289,12 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
           badge: 'TƯ DUY SÂU & 2M CONTEXT',
           color: '#D97706',
           dailyLimit: poolCapacity * 20000000, // 20M per account/day
-          usedToday: modelMap['gemini-4-argon'] || modelMap['gemini-2.5-pro'] || 0,
+          usedToday: modelMap['gemini-4-argon'] || modelMap['gemini-2.5-pro'] || modelMap['gemini-4-argon-high'] || 0,
           rpmLimit: poolCapacity * 60,
           tpmLimit: poolCapacity * 500000,
           availableAccounts: poolCapacity,
-          status: 'healthy'
+          status: 'healthy',
+          accounts: getAccountsForModel(['gemini-4-argon', 'gemini-2.5-pro', 'gemini-4-argon-high'], 20000000)
         }
       ];
 
@@ -499,6 +592,33 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     res.json({ success: true, config: rotator.getRotationConfig() });
   });
 
+  // Reset all banned/cooldown accounts in rotator
+  app.post('/api/rotator/reset-bans', (req: Request, res: Response) => {
+    try {
+      const result = rotator.unbanAllAccounts();
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Auto-Model Fallback on 429 quota exhaustion settings
+  app.get('/api/settings/fallback', (req: Request, res: Response) => {
+    res.json({
+      enabled: fallbackMgr.isAutoFallbackEnabled(),
+      defaults: DEFAULT_MODEL_FALLBACKS
+    });
+  });
+
+  app.post('/api/settings/fallback', (req: Request, res: Response) => {
+    const { enabled } = req.body;
+    fallbackMgr.setAutoFallbackEnabled(Boolean(enabled));
+    res.json({
+      success: true,
+      enabled: fallbackMgr.isAutoFallbackEnabled()
+    });
+  });
+
   // List all available profiles
   app.get('/api/profiles', (req: Request, res: Response) => {
     try {
@@ -543,6 +663,24 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     res.json({ combos: manager.getCombos() });
   });
 
+  // External Multi-Providers Endpoints (Dịch Vụ AI Mở Rộng)
+  app.get('/api/providers', (req: Request, res: Response) => {
+    const sqlite = manager.getStorage().getSqlite();
+    res.json({ providers: ExternalProviderManager.getMaskedProviders(sqlite) });
+  });
+
+  app.post('/api/providers/:id', (req: Request, res: Response) => {
+    const sqlite = manager.getStorage().getSqlite();
+    const updated = ExternalProviderManager.updateProvider(sqlite, req.params.id, req.body);
+    res.json({ success: true, providers: updated });
+  });
+
+  app.delete('/api/providers/:id', (req: Request, res: Response) => {
+    const sqlite = manager.getStorage().getSqlite();
+    const updated = ExternalProviderManager.deleteProvider(sqlite, req.params.id);
+    res.json({ success: true, providers: updated });
+  });
+
   app.post('/api/combos', (req: Request, res: Response) => {
     const { name, strategy = 'fallback', models = [] } = req.body;
     if (!name || typeof name !== 'string') {
@@ -576,6 +714,37 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
       return;
     }
     const updated = manager.addModelToCombo(req.params.id, model.trim());
+    if (!updated) {
+      res.status(404).json({ error: 'Model Combo not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Get current active system combo
+  app.get('/api/combos/active', (req: Request, res: Response) => {
+    res.json({ activeCombo: manager.getActiveSystemCombo() });
+  });
+
+  // Select active model inside a combo
+  app.post('/api/combos/:id/select-model', (req: Request, res: Response) => {
+    const { model } = req.body;
+    if (!model || typeof model !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid "model"' });
+      return;
+    }
+    const updated = manager.setActiveModelInCombo(req.params.id, model.trim());
+    if (!updated) {
+      res.status(404).json({ error: 'Model Combo not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  // Activate / Deactivate a combo for the whole system
+  app.post('/api/combos/:id/activate', (req: Request, res: Response) => {
+    const active = req.body?.active !== undefined ? Boolean(req.body.active) : true;
+    const updated = manager.setSystemActiveCombo(req.params.id, active);
     if (!updated) {
       res.status(404).json({ error: 'Model Combo not found' });
       return;
@@ -1020,14 +1189,19 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
     try {
       const status = mitm.getStatus();
       const dnsEnabled = DnsManager.isEnabled();
+      const targetMitmPort = (status.port && status.port !== 443) ? status.port : 8443;
       res.json({
         running: status.running,
         port: status.port,
+        isFallback: status.isFallback,
+        needsPortForward: status.port !== 443,
         certTrusted: status.certTrusted,
         dnsEnabled,
         trustCommand: CertManager.getTrustCommand(),
         enableDnsCommand: DnsManager.getEnableCommand(),
-        disableDnsCommand: DnsManager.getDisableCommand()
+        disableDnsCommand: DnsManager.getDisableCommand(),
+        portForwardCommand: PortForwardManager.getEnableCommand(443, targetMitmPort),
+        disablePortForwardCommand: PortForwardManager.getDisableCommand(443, targetMitmPort)
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

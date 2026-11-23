@@ -39,6 +39,8 @@ export interface ModelCombo {
   name: string;
   strategy: 'fallback' | 'round-robin';
   models: string[];
+  activeModel?: string;
+  isActive?: boolean;
   createdAt: number;
 }
 
@@ -234,6 +236,22 @@ export class ProfileStorage {
     const res = this.sqlite.deleteCombo(id);
     if (res) this.save(this.load());
     return res;
+  }
+
+  public setActiveModelInCombo(comboId: string, model: string): ModelCombo | null {
+    const res = this.sqlite.setActiveModelInCombo(comboId, model);
+    if (res) this.save(this.load());
+    return res;
+  }
+
+  public setSystemActiveCombo(comboId: string, active = true): ModelCombo | null {
+    const res = this.sqlite.setSystemActiveCombo(comboId, active);
+    if (res) this.save(this.load());
+    return res;
+  }
+
+  public getActiveSystemCombo(): ModelCombo | null {
+    return this.sqlite.getActiveSystemCombo();
   }
 
   public getStorageDirectory(): string {

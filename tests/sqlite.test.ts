@@ -62,6 +62,17 @@ describe('SqliteStorage Engine', () => {
     expect(updated?.name).toBe('Pro Suite v2');
     expect(updated?.strategy).toBe('round-robin');
 
+    // Select active model in combo
+    const withActive = sqlite.setActiveModelInCombo(combo.id, 'deepseek-r1');
+    expect(withActive?.activeModel).toBe('deepseek-r1');
+
+    // Activate combo as system default
+    const activated = sqlite.setSystemActiveCombo(combo.id, true);
+    expect(activated?.isActive).toBe(true);
+    const activeSystem = sqlite.getActiveSystemCombo();
+    expect(activeSystem?.id).toBe(combo.id);
+    expect(activeSystem?.activeModel).toBe('deepseek-r1');
+
     // Delete combo
     const deleted = sqlite.deleteCombo(combo.id);
     expect(deleted).toBe(true);

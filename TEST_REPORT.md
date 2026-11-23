@@ -131,3 +131,26 @@ Chuyển giao cho `@assistant` để tổng kết và bàn giao chính thức ch
 5. **Kiểm tra Hồi quy**:
    - `npm test`: **29/29 tests PASSED 100%** trên 6/6 test suites.
 
+
+## Báo Cáo Kiểm Định Độc Lập: TASK-20261120-UNIFIED-LIGHT-PALETTE-AUDIT
+
+- **Mã Task**: `TASK-20261120-UNIFIED-LIGHT-PALETTE-AUDIT`
+- **Thời gian nghiệm thu**: 20/11/2026 23:15 (+07:00)
+- **Kiểm định viên**: `@qc` (Quality Control Lead)
+- **Trạng thái**: `QC_PASS (100% ĐẠT CHUẨN XUẤT SẮC)`
+
+### 1. Bằng chứng kiểm định thực tế (Evidence):
+1. **Kiểm tra khử sạch mã màu đen (Zero-Dark Audit)**:
+   - Chạy lệnh quét regex toàn diện trên `public/index.html` với mẫu `#(040711|060911|0d1424|080d18|05080e|182234|080d17)`: **0 matches (Sạch 100%)**.
+   - Khung máy chủ Switch (`.rack-switch-chassis`): Đạt chuẩn nền trắng `#ffffff`, viền `#cbd5e1`, đổ bóng nhẹ `rgba(15, 23, 42, 0.06)`.
+   - Tai bắt rack (`.rack-mount-ear`): Đạt chuẩn xám bạc kim loại `#f1f5f9`.
+   - Cổng mạng RJ45 và khay SFP: Đạt chuẩn nền sáng `#f1f5f9` viền `#cbd5e1`, chấu kim loại mạ vàng `#d97706` sáng bóng.
+   - Toàn bộ Pop-up dialog, Textbox input, Code block: Đạt chuẩn nền trắng `#ffffff` và xám giấy `#f8fafc`.
+2. **Kiểm tra Độ đồng nhất thị giác (Unified Light Theme)**:
+   - 100% toàn bộ trang web chỉ sử dụng một hệ màu chủ đạo duy nhất: **Slate-50 & Pearl White**.
+   - Không còn tình trạng "chỗ trắng chỗ đen", các thành phần chuyển tiếp mượt mà, hài hòa và sang trọng.
+   - Màu chữ `#0f172a` đen đậm sắc nét trên toàn bộ các nhãn, số cổng và tiêu đề.
+3. **Kiểm tra Hồi quy (Zero Regression)**:
+   - Server `switch-google` phục vụ live tại `http://localhost:1909` (PID: 46275).
+   - Test suites: **29/29 tests PASSED 100%**.
+

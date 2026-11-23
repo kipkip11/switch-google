@@ -1,0 +1,204 @@
+/* ==========================================================================
+   Switch Google — UniFi OS Studio Design System
+   Dark-First Studio Charcoal (#0c0f14 / #151a22) + Electric Teal (#14d4b6)
+   Light Mode: macOS Sonoma Frosted Glass (#f2f4f8) + Brushed Silver Switch
+   ========================================================================== */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Studio Charcoal Surfaces */
+  --bg-canvas: #0c0f14;
+  --bg-canvas-glow: radial-gradient(ellipse 80% 42% at 50% -12%, rgba(20, 212, 182, 0.09), transparent 70%);
+  --bg-rail: #10141b;
+  --bg-surface: #151a22;
+  --bg-surface-elevated: #1a202b;
+  --bg-subtle: #11151d;
+  --bg-hover: #1e2532;
+  --bg-topbar: rgba(12, 15, 20, 0.82);
+  --bg-code: #0b0e13;
+  --bg-backdrop: rgba(4, 6, 10, 0.72);
+  --table-head-bg: #121720;
+
+  /* Borders & Specular Highlights */
+  --border-subtle: #202632;
+  --border-default: #2a3242;
+  --border-strong: #3d485e;
+  --border-highlight: rgba(255, 255, 255, 0.05);
+
+  /* Typography */
+  --text-primary: #f1f5f9;
+  --text-secondary: #a8b3c5;
+  --text-muted: #6c788c;
+  --text-on-brand: #051b18;
+
+  /* Unified Dominant Accent: UniFi Electric Teal */
+  --brand: #14d4b6;
+  --brand-hover: #2be4c7;
+  --brand-soft: rgba(20, 212, 182, 0.13);
+  --brand-border: rgba(20, 212, 182, 0.34);
+  --brand-text: #2be4c7;
+  --brand-glow: 0 0 18px rgba(20, 212, 182, 0.28);
+
+  /* Semantic Telemetry Colors (Etherlighting & Status) */
+  --status-live: #38bdf8;
+  --status-live-soft: rgba(56, 189, 248, 0.14);
+  --status-live-border: rgba(56, 189, 248, 0.35);
+
+  --status-up: #10b981;
+  --status-up-soft: rgba(16, 185, 129, 0.14);
+  --status-up-border: rgba(16, 185, 129, 0.34);
+
+  --status-warn: #f59e0b;
+  --status-warn-soft: rgba(245, 158, 11, 0.14);
+  --status-warn-border: rgba(245, 158, 11, 0.34);
+
+  --status-err: #f43f5e;
+  --status-err-soft: rgba(244, 63, 94, 0.14);
+  --status-err-border: rgba(244, 63, 94, 0.34);
+
+  --status-violet: #818cf8;
+  --status-violet-soft: rgba(129, 140, 248, 0.15);
+  --status-violet-border: rgba(129, 140, 248, 0.35);
+
+  /* UniFi Hardware Faceplate (Stealth Anodized Charcoal) */
+  --hw-bezel: linear-gradient(180deg, #1d232e 0%, #141922 100%);
+  --hw-bezel-border: #2e3748;
+  --hw-faceplate: #0f131a;
+  --hw-lcm-bg: #07090d;
+  --hw-port-bg: #171d27;
+  --hw-port-hover: #1e2634;
+  --hw-port-selected: #14282b;
+  --hw-port-border: #273040;
+  --hw-jack-bg: #0a0d12;
+  --hw-jack-inner: #151b24;
+  --hw-text-main: #f1f5f9;
+  --hw-text-sub: #8b97ab;
+
+  /* Topology Canvas */
+  --topo-bg: #10141b;
+  --topo-dot: rgba(148, 163, 184, 0.14);
+  --cable-idle: #2d3748;
+  --cable-disabled: #1e2430;
+  --topo-hub-bg: linear-gradient(180deg, #17202b 0%, #111922 100%);
+  --topo-badge-bg: #0c0f14;
+  --topo-badge-text: #2be4c7;
+
+  /* Chart.js */
+  --chart-grid: rgba(148, 163, 184, 0.09);
+  --chart-tick: #8b97ab;
+  --chart-legend: #e2e8f0;
+  --chart-tooltip-bg: #0a0d12;
+  --chart-tooltip-text: #f8fafc;
+
+  /* Shadows & Geometry */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.65);
+  --ring-focus: 0 0 0 3px rgba(20, 212, 182, 0.26);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --rail-width: 68px;
+  --topbar-height: 56px;
+}
+
+/* ==========================================================================
+   LIGHT MODE: macOS Sonoma Frosted Glass + UniFi Brushed Silver Aluminum
+   ========================================================================== */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-canvas: #f2f4f8;
+  --bg-canvas-glow: radial-gradient(ellipse 80% 42% at 50% -12%, rgba(13, 148, 136, 0.08), transparent 70%);
+  --bg-rail: rgba(255, 255, 255, 0.88);
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f5f7fa;
+  --bg-hover: #edf1f7;
+  --bg-topbar: rgba(242, 244, 248, 0.82);
+  --bg-code: #f5f7fa;
+  --bg-backdrop: rgba(15, 23, 42, 0.38);
+  --table-head-bg: #f6f8fb;
+
+  --border-subtle: #e3e8ef;
+  --border-default: #cfd7e3;
+  --border-strong: #9aa6b8;
+  --border-highlight: rgba(255, 255, 255, 0.8);
+
+  --text-primary: #111827;
+  --text-secondary: #475569;
+  --text-muted: #6b7280;
+  --text-on-brand: #ffffff;
+
+  --brand: #0d9488;
+  --brand-hover: #0f766e;
+  --brand-soft: rgba(13, 148, 136, 0.1);
+  --brand-border: rgba(13, 148, 136, 0.3);
+  --brand-text: #0f766e;
+  --brand-glow: 0 4px 14px rgba(13, 148, 136, 0.22);
+
+  --status-live: #0284c7;
+  --status-live-soft: rgba(2, 132, 199, 0.1);
+  --status-live-border: rgba(2, 132, 199, 0.28);
+
+  --status-up: #059669;
+  --status-up-soft: rgba(5, 150, 105, 0.1);
+  --status-up-border: rgba(5, 150, 105, 0.28);
+
+  --status-warn: #d97706;
+  --status-warn-soft: rgba(217, 119, 6, 0.11);
+  --status-warn-border: rgba(217, 119, 6, 0.3);
+
+  --status-err: #e11d48;
+  --status-err-soft: rgba(225, 29, 72, 0.1);
+  --status-err-border: rgba(225, 29, 72, 0.28);
+
+  --status-violet: #4f46e5;
+  --status-violet-soft: rgba(79, 70, 229, 0.1);
+  --status-violet-border: rgba(79, 70, 229, 0.28);
+
+  /* UniFi Pro Max Brushed Silver Aluminum Faceplate */
+  --hw-bezel: linear-gradient(180deg, #e8ecf2 0%, #d9e0ea 100%);
+  --hw-bezel-border: #c5cedc;
+  --hw-faceplate: #e2e7f0;
+  --hw-lcm-bg: #11161f;
+  --hw-port-bg: #ffffff;
+  --hw-port-hover: #f8fafc;
+  --hw-port-selected: #ecfdf9;
+  --hw-port-border: #cbd5e1;
+  --hw-jack-bg: #18202c;
+  --hw-jack-inner: #273244;
+  --hw-text-main: #0f172a;
+  --hw-text-sub: #475569;
+
+  --topo-bg: #f8fafc;
+  --topo-dot: rgba(15, 23, 42, 0.1);
+  --cable-idle: #cbd5e1;
+  --cable-disabled: #e2e8f0;
+  --topo-hub-bg: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  --topo-badge-bg: #111827;
+  --topo-badge-text: #2be4c7;
+
+  --chart-grid: rgba(15, 23, 42, 0.06);
+  --chart-tick: #475569;
+  --chart-legend: #111827;
+  --chart-tooltip-bg: #111827;
+  --chart-tooltip-text: #f8fafc;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.16);
+  --ring-focus: 0 0 0 3px rgba(13, 148, 136, 0.2);
+}
