@@ -17,6 +17,7 @@ class UsageTracker {
         timestamp: 0
     };
     liveTimer = null;
+    statsCache = new Map();
     constructor() {
         this.sqlite = sqliteStorage_1.SqliteStorage.getInstance();
     }
@@ -55,6 +56,7 @@ class UsageTracker {
     }
     record(record) {
         const entry = this.sqlite.recordUsage(record);
+        this.statsCache.clear();
         this.setLiveTransmission(record.profile || record.email, record.model, record.promptTokens || 0, record.completionTokens || 0, record.latencyMs || 0);
         return entry;
     }
@@ -73,12 +75,17 @@ class UsageTracker {
         // Truncate SQLite logs
         try {
             this.sqlite.db.exec('DELETE FROM usage_logs;');
+            this.statsCache.clear();
         }
         catch (_) { }
     }
     getStats(timeframeMs) {
         const now = Date.now();
         const timeframe = timeframeMs || 24 * 60 * 60 * 1000;
+        const cached = this.statsCache.get(timeframe);
+        if (cached && now - cached.timestamp < 1500) {
+            return cached.data;
+        }
         const logs = this.sqlite.getUsageLogs(10000).filter(l => l.timestamp >= now - timeframe);
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
@@ -155,7 +162,7 @@ class UsageTracker {
         }));
         const tokensPerSecond = Math.round(recentTokensLast10s / 10);
         const avgLatencyMs = logs.length > 0 ? Math.round(totalLatency / logs.length) : 0;
-        return {
+        const resultStats = {
             totalRequests: logs.length,
             totalTokens: totalPromptTokens + totalCompletionTokens,
             totalPromptTokens,
@@ -167,6 +174,8 @@ class UsageTracker {
             avgLatencyMs,
             timeSeries
         };
+        this.statsCache.set(timeframe, { data: resultStats, timestamp: now });
+        return resultStats;
     }
 }
 exports.UsageTracker = UsageTracker;

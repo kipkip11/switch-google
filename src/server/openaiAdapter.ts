@@ -7,6 +7,7 @@ import { cleanJSONSchemaForAntigravity } from './schemaCleaner';
 import { usageTracker } from '../usage/tracker';
 import { ModelFallbackManager } from '../services/modelFallback';
 import { ExternalProviderManager } from '../services/externalProviders';
+import { SmartRouter } from '../services/smartRouter';
 
 const ANTIGRAVITY_SYSTEM_INSTRUCTION =
   'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding. You are pair programming with a USER to solve their coding task.';
@@ -244,8 +245,9 @@ function convertMessagesToGemini(messages: any[]): { systemInstruction?: any; co
 
       if (Array.isArray(msg.tool_calls)) {
         for (const tc of msg.tool_calls) {
-          if (tc.id && tc.function?.name) {
-            toolCallMap.set(tc.id, tc.function.name);
+          const callId = tc.id || `toolu_${crypto.randomBytes(8).toString('hex')}`;
+          if (callId && tc.function?.name) {
+            toolCallMap.set(callId, tc.function.name);
           }
           let args = {};
           try {
@@ -257,6 +259,7 @@ function convertMessagesToGemini(messages: any[]): { systemInstruction?: any; co
           }
           parts.push({
             functionCall: {
+              id: callId,
               name: tc.function?.name || 'function',
               args
             },
@@ -291,6 +294,7 @@ function convertMessagesToGemini(messages: any[]): { systemInstruction?: any; co
         parts: [
           {
             functionResponse: {
+              ...(msg.tool_call_id ? { id: msg.tool_call_id } : {}),
               name: fnName,
               response: responseObj
             }
@@ -327,6 +331,43 @@ function convertMessagesToGemini(messages: any[]): { systemInstruction?: any; co
 
   return { systemInstruction, contents };
 }
+
+/**
+ * Cắt gọn ngữ cảnh thông minh (Context Compaction) khi lịch sử chat quá dài (> 80 tin nhắn)
+ * Giữ lại system prompt, tin nhắn đầu tiên (chứa context project) và 45 tin nhắn gần nhất,
+ * đồng thời đảm bảo không cắt đứt cặp assistant(tool_calls) -> tool(functionResponse).
+ */
+function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
+  if (!Array.isArray(messages) || messages.length <= 80) {
+    return messages;
+  }
+
+  const systemMsgs = messages.filter((m) => m && m.role === 'system');
+  const nonSystem = messages.filter((m) => m && m.role !== 'system');
+  if (nonSystem.length <= maxNonSystem + 2) {
+    return messages;
+  }
+
+  const firstUserIdx = nonSystem.findIndex((m) => m.role === 'user');
+  const headMsgs = firstUserIdx >= 0 ? [nonSystem[firstUserIdx]] : [];
+
+  let tailStart = Math.max(firstUserIdx + 1, nonSystem.length - maxNonSystem);
+  // Lùi hoặc tiến điểm cắt để không bắt đầu bằng một message role='tool' mồ côi
+  while (tailStart < nonSystem.length && nonSystem[tailStart].role === 'tool') {
+    tailStart--;
+  }
+  if (tailStart <= firstUserIdx) {
+    return messages;
+  }
+
+  const tailMsgs = nonSystem.slice(tailStart);
+  const droppedCount = tailStart - headMsgs.length;
+  console.log(`[ContextCompactor] Đã rút gọn ${droppedCount} lượt hội thoại cũ (giữ ${systemMsgs.length} system + ${headMsgs.length} head + ${tailMsgs.length} tail).`);
+  return [...systemMsgs, ...headMsgs, ...tailMsgs];
+}
+
+// Bộ nhớ tạm lưu thời điểm model bị cạn quota toàn cục (modelName -> hết hạn lúc timestamp)
+const exhaustedModelsCache = new Map<string, number>();
 
 export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRotator, port = 1909): Router {
   const router = Router();
@@ -448,23 +489,47 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
 
       console.log(`[Request] model=${model}, stream=${stream}, msgs=${messages.length}, tools=${tools?.length || 0}`);
 
-      // Check if requested model is a Model Combo
+      // Check if requested model is a Model Combo or System Active Combo Override
       const combos = manager.getCombos();
       let combo = combos.find((c) => c.name.toLowerCase() === model.toLowerCase());
-      if (!combo && (model === 'default' || model === 'auto')) {
+      if (!combo) {
+        // Nếu người dùng đã bật "Kích Hoạt Hệ Thống" cho một Combo, tự động điều phối qua Combo đó
         combo = manager.getActiveSystemCombo() || undefined;
       }
 
       let modelCandidates: string[] = [];
       if (combo && combo.models.length > 0) {
-        const chosen = combo.activeModel || combo.models[0];
-        const remaining = combo.models.filter((m) => m !== chosen);
-        if (combo.strategy === 'round-robin') {
-          modelCandidates = [...combo.models];
-          const first = modelCandidates.shift()!;
-          modelCandidates.push(first);
+        if (combo.strategy === 'smart-routing') {
+          const analysis = SmartRouter.calculateComplexity(messages, tools);
+          console.log(`[SmartRouter] Phân tích tác vụ cho Combo "${combo.name}": isComplex=${analysis.isComplex}, score=${analysis.score} (${analysis.reason})`);
+          const prioritized = SmartRouter.prioritizeModels(combo.models, analysis.isComplex);
+          // Nếu người dùng đã bấm chọn activeModel và model đó cùng nhóm độ phức tạp, đưa nó lên đầu tiên
+          if (combo.activeModel && combo.models.includes(combo.activeModel)) {
+            const isChosenSmart = SmartRouter.isSmartModel(combo.activeModel);
+            const isChosenFast = SmartRouter.isFastModel(combo.activeModel);
+            if ((analysis.isComplex && isChosenSmart) || (!analysis.isComplex && isChosenFast)) {
+              modelCandidates = [combo.activeModel, ...prioritized.filter((m) => m !== combo.activeModel)];
+            } else {
+              modelCandidates = prioritized;
+            }
+          } else {
+            modelCandidates = prioritized;
+          }
+        } else if (combo.strategy === 'round-robin') {
+          const chosen = combo.activeModel && combo.models.includes(combo.activeModel) ? combo.activeModel : combo.models[0];
+          const remaining = combo.models.filter((m) => m !== chosen);
+          modelCandidates = [chosen, ...remaining];
+          // Xoay tự động activeModel sang model kế tiếp cho lượt sau (chạy bất đồng bộ không chặn request)
+          const nextIdx = (combo.models.indexOf(chosen) + 1) % combo.models.length;
+          setImmediate(() => {
+            try {
+              manager.setActiveModelInCombo(combo.id, combo.models[nextIdx]);
+            } catch (_) {}
+          });
         } else {
-          // Luôn ưu tiên model được chọn trong combo trước, sau đó là các model dự phòng còn lại
+          // Fallback strategy: Luôn ưu tiên model được chọn trong combo trước, sau đó là các model dự phòng còn lại
+          const chosen = combo.activeModel || combo.models[0];
+          const remaining = combo.models.filter((m) => m !== chosen);
           modelCandidates = [chosen, ...remaining];
         }
       } else {
@@ -472,8 +537,22 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
         modelCandidates = fallbackMgr.getFallbackChain(model);
       }
 
+      // Đưa các model đang bị cạn quota toàn cục (trong vòng 15 phút gần đây) xuống cuối danh sách ưu tiên
+      const nowTs = Date.now();
+      const readyModels = modelCandidates.filter((m) => (exhaustedModelsCache.get(m) || 0) <= nowTs);
+      const exhaustedModels = modelCandidates.filter((m) => (exhaustedModelsCache.get(m) || 0) > nowTs);
+      if (readyModels.length > 0 && exhaustedModels.length > 0) {
+        modelCandidates = [...readyModels, ...exhaustedModels];
+      }
+
+      // Rút gọn ngữ cảnh chỉ khi được bật tường minh qua biến môi trường (mặc định tắt để giữ Zero Data Alteration)
+      const compactedMessages =
+        process.env.SG_ENABLE_CONTEXT_COMPACT === '1'
+          ? compactMessagesWindow(messages, 45)
+          : messages;
+
       // Convert messages (including tool calls & function results) to Gemini format
-      const { systemInstruction, contents } = convertMessagesToGemini(messages);
+      const { systemInstruction, contents } = convertMessagesToGemini(compactedMessages);
 
       const geminiBody: any = {
         contents
@@ -534,10 +613,17 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
 
             const { geminiRes, account } = result;
             res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
             res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Accel-Buffering', 'no');
             res.setHeader('X-Account-Used', account);
             res.setHeader('X-Model-Used', targetModel);
+            if (typeof (res as any).flushHeaders === 'function') {
+              (res as any).flushHeaders();
+            }
+            if (req.socket && typeof req.socket.setNoDelay === 'function') {
+              req.socket.setNoDelay(true);
+            }
 
             const reader = geminiRes.body?.getReader();
             const decoder = new TextDecoder();
@@ -745,14 +831,15 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             }
           }
 
-          // Fallback an toàn: Nếu contentText rỗng nhưng có reasoningText (do nhầm lẫn), chuyển sang contentText
-          if (!contentText && reasoningText) {
+          // Fallback an toàn: Nếu contentText rỗng và không có toolCalls nhưng có reasoningText, chuyển sang contentText
+          if (!contentText && toolCalls.length === 0 && reasoningText) {
             contentText = reasoningText;
             reasoningText = '';
           }
 
-          const promptTokens = data.usageMetadata?.promptTokenCount || 0;
-          const completionTokens = data.usageMetadata?.candidatesTokenCount || 0;
+          const usageMeta = data.usageMetadata || data.response?.usageMetadata || {};
+          const promptTokens = usageMeta.promptTokenCount || 0;
+          const completionTokens = usageMeta.candidatesTokenCount || 0;
 
           res.setHeader('X-Account-Used', accountUsed);
           res.setHeader('X-Model-Used', targetModel);
@@ -807,6 +894,10 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
           return;
         } catch (err: any) {
           lastError = err;
+          // Ghi nhớ model đã cạn quota trên toàn bộ pool trong 15 phút để các request sau không mất 3s-4s thử lại vô ích
+          if (err.status === 429 || (err.message && (err.message.includes('QUOTA_EXHAUSTED') || err.message.includes('quota reached')))) {
+            exhaustedModelsCache.set(targetModel, Date.now() + 15 * 60 * 1000);
+          }
           rotator.clearCooldowns();
           console.warn(`[Failover] Model [${targetModel}] gặp lỗi hoặc cạn quota: ${err.message}. Tiếp tục thử model dự phòng...`);
         }

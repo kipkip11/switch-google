@@ -32,6 +32,9 @@ export interface SwitchPortInfo {
   isDisabled: boolean;
   isBlockedAntigravity?: boolean;
   isUpgradingWeb?: boolean;
+  planTier?: string;
+  planExpiresAt?: string;
+  costVnd?: number;
   linkStatus: 'up' | 'cooldown' | 'banned' | 'down';
   cooldownRemainingSeconds: number;
   totalRequests: number;
@@ -60,6 +63,29 @@ export class AccountRotator {
   constructor(manager: ProfileManager) {
     this.manager = manager;
     this.sqlite = manager.getStorage().getSqlite();
+    this.startBackgroundTokenPrewarmer();
+  }
+
+  /**
+   * Background Token Pre-Warmer: Tự động làm mới OAuth access_token trước khi hết hạn 5 phút
+   * Giúp request thực tế luôn có sẵn token nóng trong RAM (0ms OAuth handshake wait)
+   */
+  private startBackgroundTokenPrewarmer(): void {
+    setInterval(async () => {
+      try {
+        const profiles = this.manager.listProfiles();
+        const now = Date.now();
+        for (const p of profiles) {
+          if (p.type === 'oauth' || p.type === 'token') {
+            const exp = p.tokens?.expiry_date;
+            // Nếu sắp hết hạn trong vòng 5 phút tới và có refresh_token
+            if (exp && exp - now < 5 * 60 * 1000 && p.tokens?.refresh_token) {
+              await this.manager.getTokenForProfile(p.name, true).catch(() => {});
+            }
+          }
+        }
+      } catch (_) {}
+    }, 60 * 1000).unref();
   }
 
   public async triggerAutoUpgradeToWeb(profileName: string): Promise<void> {
@@ -161,6 +187,8 @@ export class AccountRotator {
       else if (isCooldown) linkStatus = 'cooldown';
 
       const accountTokens = usage.tokensByAccount[p.name] || (p.email ? usage.tokensByAccount[p.email] : 0) || 0;
+      // Quy đổi chi phí ước tính theo VNĐ (Trung bình ~ 9.000 VNĐ / 1M token đối với Gemini Flash / Pro)
+      const costVnd = Math.round((accountTokens / 1_000_000) * 9000);
 
       const isUpgradingWeb = this.upgradingProfiles.has(p.name);
       return {
@@ -168,6 +196,9 @@ export class AccountRotator {
         profile: p.name,
         email: p.email,
         type: p.type,
+        planTier: p.planTier || (p.type === 'web_session' ? 'Web Session Cookie' : p.type === 'token' ? 'OAuth Access Token' : 'Google AI Studio Key'),
+        planExpiresAt: p.planExpiresAt || (p.tokens?.expiry_date ? new Date(p.tokens.expiry_date).toLocaleDateString('vi-VN') : undefined),
+        costVnd,
         isActiveDefault: p.name === activeName,
         isServingNow: p.name === this.currentlyServingAccount || (now - this.lastServedAt < 3500 && p.name === this.currentlyServingAccount),
         isDisabled,
@@ -309,10 +340,12 @@ export class AccountRotator {
     const profiles = this.manager.listProfiles();
     const now = Date.now();
 
-    // Lọc ra các tài khoản không bị disable thủ công, không bị ban, không bị chặn Antigravity (nếu còn tài khoản khác) và không bị cooldown
+    // Lọc ra các tài khoản không bị disable thủ công, không bị ban, không bị cooldown
+    // VÀ LOẠI BỎ các tài khoản web_session đã hết hạn cookie (tránh failover lặp đi lặp lại gây tăng độ trễ)
     const available = profiles
       .filter((p) => {
         if (this.disabledProfiles.has(p.name)) return false;
+        if (p.type === 'web_session' && p.isExpired) return false;
         const s = this.stats.get(p.name);
         if (s?.isBanned) return false;
         if (p.isBlockedAntigravity && p.type === 'oauth') return false;
@@ -320,12 +353,12 @@ export class AccountRotator {
       })
       .map((p) => p.name);
 
-    // Nếu tất cả tài khoản sạch đều hết, mở lại các tài khoản non-banned để thử
+    // Nếu tất cả tài khoản sạch đều hết, mở lại các tài khoản OAuth/Token còn hạn (tránh kích hoạt cookie hỏng)
     if (available.length === 0 && profiles.length > 0) {
       const nonBanned = profiles
-        .filter((p) => !this.disabledProfiles.has(p.name) && !this.stats.get(p.name)?.isBanned)
+        .filter((p) => !this.disabledProfiles.has(p.name) && !(p.type === 'web_session' && p.isExpired) && !this.stats.get(p.name)?.isBanned)
         .map((p) => p.name);
-      return nonBanned.length > 0 ? nonBanned : profiles.map((p) => p.name);
+      return nonBanned.length > 0 ? nonBanned : profiles.filter(p => !(p.type === 'web_session' && p.isExpired)).map((p) => p.name);
     }
 
     return available;
@@ -343,11 +376,12 @@ export class AccountRotator {
 
     if (availableNames.length === 0) {
       const fallbackRemaining = allProfiles
+        .filter((p) => !(p.type === 'web_session' && p.isExpired) && !this.disabledProfiles.has(p.name))
         .map((p) => p.name)
         .filter((name) => !excludedAccounts.includes(name));
 
       if (fallbackRemaining.length === 0) {
-        throw new Error('Tất cả tài khoản trong pool đều đã được thử và gặp lỗi.');
+        throw new Error('Tất cả tài khoản hợp lệ trong pool đều đã được thử và gặp lỗi.');
       }
       availableNames.push(...fallbackRemaining);
     }
@@ -369,10 +403,20 @@ export class AccountRotator {
       this.currentTurnRequests += 1;
     } else {
       // Bắt đầu lượt mới cho tài khoản tiếp theo
+      const profileMap = new Map(allProfiles.map((p) => [p.name, p]));
+      const getFastTier = (name: string): number => {
+        const t = profileMap.get(name)?.type;
+        // Ưu tiên cổng kết nối trực tiếp API Google (OAuth / Token / API Key) tốc độ cao trước, Web Session Cookie sau
+        if (t === 'oauth' || t === 'token' || t === 'api_key') return 0;
+        return 1;
+      };
+
       if (config.strategy === 'least-traffic') {
-        // Cân bằng tải theo lưu lượng: chọn tài khoản có tổng token ít nhất
+        // Cân bằng tải theo lưu lượng: ưu tiên cổng tốc độ cao + chọn tài khoản có tổng token ít nhất
         const usage = usageTracker.getStats();
         const sortedByTraffic = [...availableNames].sort((a, b) => {
+          const tierDiff = getFastTier(a) - getFastTier(b);
+          if (tierDiff !== 0) return tierDiff;
           const tokensA = usage.tokensByAccount[a] || 0;
           const tokensB = usage.tokensByAccount[b] || 0;
           if (tokensA !== tokensB) return tokensA - tokensB;
@@ -414,8 +458,8 @@ export class AccountRotator {
   public async executeWithFailover<T>(
     fn: (creds: AccountCredentials) => Promise<T>
   ): Promise<{ result: T; accountUsed: string }> {
-    const allProfiles = this.manager.listProfiles();
-    const maxAttempts = Math.max(1, allProfiles.length);
+    const validAvailable = await this.getAvailableAccounts();
+    const maxAttempts = Math.max(1, validAvailable.length);
     const triedAccounts: string[] = [];
     let lastError: any = null;
 
@@ -424,9 +468,7 @@ export class AccountRotator {
       try {
         creds = await this.getNextAccount(triedAccounts);
       } catch (err: any) {
-        const remaining = allProfiles
-          .map((p) => p.name)
-          .filter((n) => !triedAccounts.includes(n));
+        const remaining = validAvailable.filter((n) => !triedAccounts.includes(n));
         if (remaining.length > 0) {
           const badAccount = remaining[0];
           triedAccounts.push(badAccount);
@@ -450,6 +492,12 @@ export class AccountRotator {
         lastError = err;
         const errMsg = err.message || '';
         console.warn(`[Failover] Tài khoản [${creds.profile}] thất bại (${err.status || ''} ${errMsg.slice(0, 100)}). Chuyển tài khoản...`);
+
+        // Nếu lỗi HTTP 400 invalid_request_error (do payload hoặc model không được Google hỗ trợ),
+        // ngắt ngay để chuyển sang model dự phòng tiếp theo thay vì thử lặp lại trên các tài khoản khác!
+        if (err.status === 400 && (errMsg.includes('invalid_request') || errMsg.includes('INVALID_ARGUMENT'))) {
+          throw err;
+        }
         const isBannedIssue =
           errMsg.includes('TOS_VIOLATION') ||
           errMsg.includes('VALIDATION_REQUIRED') ||

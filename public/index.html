@@ -81,13 +81,23 @@
         </button>
 
         <button class="rail-btn" role="tab" aria-selected="false" data-tab="providers" data-tooltip="Dịch Vụ AI (Multi-Providers)" onclick="navigateTab('providers')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
             <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
             <line x1="6" y1="6" x2="6.01" y2="6"></line>
             <line x1="6" y1="18" x2="6.01" y2="18"></line>
           </svg>
-          <span class="rail-label-mobile">Dịch Vụ AI</span>
+          <span class="rail-label">Dịch Vụ AI</span>
+        </button>
+
+        <button class="rail-btn" role="tab" aria-selected="false" data-tab="subscriptions" data-tooltip="Gói Đăng Ký &amp; Thời Hạn" onclick="navigateTab('subscriptions')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="rail-label">Gói &amp; Hạn</span>
         </button>
 
         <button class="rail-btn" role="tab" aria-selected="false" data-tab="integration" data-tooltip="Tích Hợp &amp; Direct Link" onclick="navigateTab('integration')">
@@ -455,8 +465,17 @@
                 <span class="metric-tile-label">Cổng tải lớn nhất</span>
                 <span class="badge badge-warning">TOP LOAD</span>
               </div>
-              <div class="metric-tile-val" id="hud-top-account" style="font-size: 1rem;">Chưa có dữ liệu</div>
+              <div class="metric-tile-val" id="hud-top-account" style="font-size: 0.95rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Chưa có dữ liệu</div>
               <div class="metric-tile-sub" id="hud-top-account-tokens">0 tokens gánh tải</div>
+            </div>
+
+            <div class="metric-tile">
+              <div class="metric-tile-top">
+                <span class="metric-tile-label">Chi Phí Token VNĐ</span>
+                <span class="badge badge-success" id="hud-cost-badge">EST. VNĐ</span>
+              </div>
+              <div class="metric-tile-val" id="hud-total-cost-vnd" style="font-size: 1.15rem; color: #10B981;">0 đ</div>
+              <div class="metric-tile-sub" id="hud-total-cost-tokens">0 tokens đã dùng</div>
             </div>
           </div>
 
@@ -464,12 +483,13 @@
             <div class="card-header">
               <div class="card-title-group">
                 <h2 class="card-title">Lưu Lượng Token Theo Thời Gian</h2>
-                <p class="card-desc">Giám sát lưu lượng Prompt (Input) và Completion (Output) theo khung thời gian.</p>
+                <p class="card-desc">Giám sát lưu lượng Prompt (Input), Completion (Output) và quy đổi chi phí VNĐ theo khung thời gian.</p>
               </div>
               <div class="card-actions">
                 <div class="timeframe-group" role="group" aria-label="Khung thời gian">
                   <button class="timeframe-btn" id="tf-btn-hour" onclick="switchAnalyticsPeriod('hour')">Giờ</button>
                   <button class="timeframe-btn active" id="tf-btn-day" onclick="switchAnalyticsPeriod('day')">Ngày</button>
+                  <button class="timeframe-btn" id="tf-btn-week" onclick="switchAnalyticsPeriod('week')">Tuần</button>
                   <button class="timeframe-btn" id="tf-btn-month" onclick="switchAnalyticsPeriod('month')">Tháng</button>
                   <button class="timeframe-btn" id="tf-btn-year" onclick="switchAnalyticsPeriod('year')">Năm</button>
                 </div>
@@ -584,6 +604,7 @@
                 <select id="combo-mode" class="input-control" style="flex: 1.2; min-width: 200px;" aria-label="Chiến lược Combo">
                   <option value="fallback">Chiến lược: Fallback (Ưu tiên tuần tự)</option>
                   <option value="round-robin">Chiến lược: Round-Robin (Luân phiên)</option>
+                  <option value="smart-routing">Chiến lược: 🧠 Smart-Routing (Tự động theo Logic &amp; Code)</option>
                 </select>
                 <button class="btn btn-primary" onclick="submitCreateCombo()">Lưu Model Combo</button>
               </div>
@@ -694,9 +715,108 @@
         </section>
 
         <!-- ============================================================ -->
+        <!-- PANE: SUBSCRIPTIONS & PLANS                                  -->
+        <!-- ============================================================ -->
+        <section class="view-pane" id="pane-subscriptions" role="tabpanel">
+          <div class="card" style="margin-bottom: 24px; border-radius: 12px; border: 1px solid var(--border-color);">
+            <div class="card-header" style="padding: 20px 24px;">
+              <div class="card-title-group">
+                <div class="card-title" style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 1.15rem; font-weight: 700;">📅 Quản Lý Gói Đăng Ký &amp; Thời Hạn Tài Khoản</span>
+                  <span class="badge badge-success" id="sub-active-count-badge">Active</span>
+                </div>
+                <p class="card-desc" style="margin-top: 6px; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">
+                  Theo dõi gói đăng ký (Google Workspace, AI Premium, Free Tier), hạn mức và thời gian hết hạn của từng tài khoản Google trong hệ thống để kịp thời gia hạn hoặc làm mới token.
+                </p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="fetchSubscriptionsList()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Làm Mới
+              </button>
+            </div>
+          </div>
+
+          <!-- Subscriptions Table / Cards -->
+          <div class="card" style="border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden;">
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                <thead>
+                  <tr style="background: var(--bg-canvas, rgba(0,0,0,0.03)); border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
+                    <th style="padding: 14px 20px;">TÀI KHOẢN</th>
+                    <th style="padding: 14px 20px;">LOẠI KẾT NỐI</th>
+                    <th style="padding: 14px 20px;">GÓI ĐĂNG KÝ</th>
+                    <th style="padding: 14px 20px;">THỜI HẠN / HẾT HẠN</th>
+                    <th style="padding: 14px 20px;">TRẠNG THÁI</th>
+                    <th style="padding: 14px 20px; text-align: right;">THAO TÁC</th>
+                  </tr>
+                </thead>
+                <tbody id="subscriptions-table-body">
+                  <tr>
+                    <td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted);">Đang tải danh sách tài khoản...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
         <!-- PANE 6: INTEGRATION & ANTIGRAVITY DIRECT LINK                -->
         <!-- ============================================================ -->
         <section class="view-pane" id="pane-integration" role="tabpanel">
+          <!-- CARD: REMOTE & MULTI-DEVICE ACCESS (TAILSCALE & CLOUDFLARE) -->
+          <div class="card" style="margin-bottom: 20px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card);">
+            <div class="card-header" style="padding: 18px 24px;">
+              <div class="card-title-group">
+                <div class="card-title" style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 1.15rem; font-weight: 700;">🌐 Kết Nối Đa Thiết Bị (Tailscale &amp; Cloudflare Tunnel)</span>
+                  <span class="badge badge-success" id="remote-tailscale-badge">Tailscale Ready</span>
+                </div>
+                <p class="card-desc" style="margin-top: 4px; color: var(--text-muted); font-size: 0.86rem;">
+                  Cho phép máy tính khác trong mạng LAN, qua Tailscale Mesh VPN, hoặc mở URL an toàn qua Cloudflare Tunnel để kết nối với Switch Google.
+                </p>
+              </div>
+            </div>
+
+            <div style="padding: 0 24px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+              <!-- Panel Tailscale -->
+              <div style="background: var(--bg-canvas, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="color: var(--text-main); font-size: 0.95rem;">🔒 Mạng Riêng Tailscale (Khuyên Dùng)</strong>
+                    <span class="badge badge-info" id="remote-ts-ip-badge">100.72.75.106</span>
+                  </div>
+                  <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;">
+                    Kết nối an toàn tuyệt đối qua VPN WireGuard. Dùng Base URL này cho các máy Windows/Linux khác đã cài Tailscale:
+                  </p>
+                  <pre class="code-block" id="remote-ts-base-url" style="font-size: 0.8rem; padding: 8px 12px;">http://100.72.75.106:1909/v1</pre>
+                </div>
+                <button class="btn btn-secondary btn-sm" style="margin-top: 10px; width: 100%;" onclick="copySnippet('http://100.72.75.106:1909/v1')">Copy URL Tailscale</button>
+              </div>
+
+              <!-- Panel Cloudflare Tunnel -->
+              <div style="background: var(--bg-canvas, rgba(0,0,0,0.02)); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="color: var(--text-main); font-size: 0.95rem;">⚡ Cloudflare Quick Tunnel</strong>
+                    <label class="switch" style="cursor: pointer;">
+                      <input type="checkbox" id="toggle-cf-tunnel" onchange="toggleCloudflareTunnel(this.checked)">
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+                  <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;">
+                    Mở đường truyền Internet công khai (HTTPS) 1-Click để truy cập từ bất kỳ mạng nào:
+                  </p>
+                  <pre class="code-block" id="remote-cf-url-box" style="font-size: 0.8rem; padding: 8px 12px; color: var(--text-muted);">Chưa kích hoạt Cloudflare Tunnel</pre>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-copy-cf" style="margin-top: 10px; width: 100%;" disabled onclick="copyCloudflareUrl()">Copy Public URL</button>
+              </div>
+            </div>
+          </div>
+
           <div class="mitm-banner">
             <div class="card-header" style="margin-bottom: 0;">
               <div class="card-title-group">
@@ -1104,8 +1224,9 @@ coding-agent --model gemini-3.8-flash</pre>
         <div class="field-group">
           <label class="field-label" for="edit-combo-strategy">Chiến lược</label>
           <select id="edit-combo-strategy" class="input-control">
-            <option value="fallback">Fallback (Tuần tự)</option>
+            <option value="fallback">Fallback (Tuần tự khi lỗi)</option>
             <option value="round-robin">Round-Robin (Luân phiên)</option>
+            <option value="smart-routing">🧠 Smart-Routing (Tự động theo độ phức tạp logic/code)</option>
           </select>
         </div>
       </div>
@@ -1192,6 +1313,7 @@ coding-agent --model gemini-3.8-flash</pre>
   <script src="js/analytics-view.js"></script>
   <script src="js/management-view.js"></script>
   <script src="js/providers-view.js"></script>
+  <script src="js/subscriptions-view.js"></script>
   <script src="js/switch-view.js"></script>
 </body>
 </html>

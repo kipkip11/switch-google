@@ -665,6 +665,13 @@ export class SqliteStorage {
   public getAllProfiles(): GoogleProfile[] {
     this.ensureValidDb();
     try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_tier TEXT;').run();
+    } catch (_) {}
+    try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_expires_at TEXT;').run();
+    } catch (_) {}
+
+    try {
       const rows: any[] = this.db.prepare('SELECT * FROM profiles ORDER BY name ASC').all();
       return rows.map((r) => ({
         name: r.name,
@@ -673,6 +680,8 @@ export class SqliteStorage {
         apiKey: r.api_key || undefined,
         cookies: r.cookies || undefined,
         isBlockedAntigravity: r.is_blocked_antigravity === 1,
+        planTier: r.plan_tier || undefined,
+        planExpiresAt: r.plan_expires_at || undefined,
         tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
         createdAt: r.created_at,
         updatedAt: r.updated_at
@@ -689,6 +698,8 @@ export class SqliteStorage {
           apiKey: r.api_key || undefined,
           cookies: r.cookies || undefined,
           isBlockedAntigravity: r.is_blocked_antigravity === 1,
+          planTier: r.plan_tier || undefined,
+          planExpiresAt: r.plan_expires_at || undefined,
           tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
           createdAt: r.created_at,
           updatedAt: r.updated_at
@@ -744,11 +755,17 @@ export class SqliteStorage {
     try {
       this.db.prepare('ALTER TABLE profiles ADD COLUMN is_blocked_antigravity INTEGER DEFAULT 0;').run();
     } catch (_) {}
+    try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_tier TEXT;').run();
+    } catch (_) {}
+    try {
+      this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_expires_at TEXT;').run();
+    } catch (_) {}
 
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO profiles 
-      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at, is_blocked_antigravity)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at, is_blocked_antigravity, plan_tier, plan_expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       profile.name,
@@ -759,7 +776,9 @@ export class SqliteStorage {
       JSON.stringify(profile.tokens || {}),
       profile.createdAt || Date.now(),
       profile.updatedAt || Date.now(),
-      profile.isBlockedAntigravity ? 1 : 0
+      profile.isBlockedAntigravity ? 1 : 0,
+      profile.planTier || null,
+      profile.planExpiresAt || null
     );
   }
 
@@ -865,7 +884,7 @@ export class SqliteStorage {
     `).run(combo.id, combo.name, combo.strategy, JSON.stringify(combo.models || []), activeModel, isActive, combo.createdAt);
   }
 
-  public createCombo(name: string, strategy: 'fallback' | 'round-robin', models: string[]): ModelCombo {
+  public createCombo(name: string, strategy: 'fallback' | 'round-robin' | 'smart-routing', models: string[]): ModelCombo {
     const existing = this.getCombo(name.trim());
     const cleanModels = models.filter((m) => m && m.trim().length > 0);
     const combo: ModelCombo = {
@@ -881,7 +900,7 @@ export class SqliteStorage {
     return combo;
   }
 
-  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin'; models?: string[]; activeModel?: string; isActive?: boolean }): ModelCombo | null {
+  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin' | 'smart-routing'; models?: string[]; activeModel?: string; isActive?: boolean }): ModelCombo | null {
     const combo = this.getCombo(id);
     if (!combo) return null;
     if (updates.name !== undefined) combo.name = updates.name.trim();

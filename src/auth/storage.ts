@@ -22,6 +22,8 @@ export interface GoogleProfile {
   cookies?: string;
   type?: ProfileType;
   isBlockedAntigravity?: boolean;
+  planTier?: string;
+  planExpiresAt?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -37,7 +39,7 @@ export interface VirtualApiKey {
 export interface ModelCombo {
   id: string;
   name: string;
-  strategy: 'fallback' | 'round-robin';
+  strategy: 'fallback' | 'round-robin' | 'smart-routing';
   models: string[];
   activeModel?: string;
   isActive?: boolean;
@@ -57,6 +59,7 @@ export class ProfileStorage {
   private storageFile: string;
   private keyFile: string;
   private encryptionKey: Buffer;
+  private memCache: { data: StorageData; timestamp: number } | null = null;
 
   constructor(customBaseDir?: string) {
     this.baseDir = customBaseDir || path.join(os.homedir(), '.switch-google');
@@ -111,7 +114,16 @@ export class ProfileStorage {
     this.sqlite.close();
   }
 
+  public invalidateCache(): void {
+    this.memCache = null;
+  }
+
   public load(): StorageData {
+    const now = Date.now();
+    if (this.memCache && now - this.memCache.timestamp < 2000) {
+      return this.memCache.data;
+    }
+
     const profilesList = this.sqlite.getAllProfiles();
     const profiles: Record<string, GoogleProfile> = {};
     for (const p of profilesList) {
@@ -122,15 +134,18 @@ export class ProfileStorage {
     const apiKeys = this.sqlite.getApiKeys();
     const combos = this.sqlite.getCombos();
 
-    return {
+    const data: StorageData = {
       activeProfile,
       profiles,
       apiKeys,
       combos
     };
+    this.memCache = { data, timestamp: now };
+    return data;
   }
 
   public save(data: StorageData): void {
+    this.memCache = null;
     data.apiKeys = data.apiKeys || [];
     data.combos = data.combos || [];
 
@@ -184,74 +199,94 @@ export class ProfileStorage {
   }
 
   public getApiKeys(): VirtualApiKey[] {
-    return this.sqlite.getApiKeys();
+    return this.load().apiKeys || [];
   }
 
   public createApiKey(name: string): VirtualApiKey {
     const key = this.sqlite.createApiKey(name);
-    // sync encrypted json
+    this.invalidateCache();
     this.save(this.load());
     return key;
   }
 
   public deleteApiKey(id: string): boolean {
     const res = this.sqlite.deleteApiKey(id);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
+  private lastTouchMap: Map<string, number> = new Map();
   public touchApiKey(keyString: string): void {
-    this.sqlite.touchApiKey(keyString);
+    const now = Date.now();
+    const last = this.lastTouchMap.get(keyString) || 0;
+    // Chỉ ghi xuống SQLite tối đa 1 lần mỗi 30 giây cho mỗi key để triệt tiêu độ trễ Disk I/O trên luồng chính
+    if (now - last > 30000) {
+      this.lastTouchMap.set(keyString, now);
+      setImmediate(() => {
+        try {
+          this.sqlite.touchApiKey(keyString);
+        } catch (_) {}
+      });
+    }
   }
 
   public getCombos(): ModelCombo[] {
-    return this.sqlite.getCombos();
+    return this.load().combos || [];
   }
 
-  public createCombo(name: string, strategy: 'fallback' | 'round-robin', models: string[]): ModelCombo {
+  public createCombo(name: string, strategy: 'fallback' | 'round-robin' | 'smart-routing', models: string[]): ModelCombo {
     const combo = this.sqlite.createCombo(name, strategy, models);
+    this.invalidateCache();
     this.save(this.load());
     return combo;
   }
 
-  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin'; models?: string[] }): ModelCombo | null {
+  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin' | 'smart-routing'; models?: string[] }): ModelCombo | null {
     const res = this.sqlite.updateCombo(id, updates);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public addModelToCombo(comboId: string, model: string): ModelCombo | null {
     const res = this.sqlite.addModelToCombo(comboId, model);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public removeModelFromCombo(comboId: string, model: string): ModelCombo | null {
     const res = this.sqlite.removeModelFromCombo(comboId, model);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public deleteCombo(id: string): boolean {
     const res = this.sqlite.deleteCombo(id);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public setActiveModelInCombo(comboId: string, model: string): ModelCombo | null {
     const res = this.sqlite.setActiveModelInCombo(comboId, model);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public setSystemActiveCombo(comboId: string, active = true): ModelCombo | null {
     const res = this.sqlite.setSystemActiveCombo(comboId, active);
+    this.invalidateCache();
     if (res) this.save(this.load());
     return res;
   }
 
   public getActiveSystemCombo(): ModelCombo | null {
-    return this.sqlite.getActiveSystemCombo();
+    const combos = this.load().combos || [];
+    return combos.find((c) => c.isActive) || null;
   }
 
   public getStorageDirectory(): string {

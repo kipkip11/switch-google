@@ -61,6 +61,7 @@ export class UsageTracker {
     timestamp: 0
   };
   private liveTimer: NodeJS.Timeout | null = null;
+  private statsCache: Map<number, { data: UsageStats; timestamp: number }> = new Map();
 
   private constructor() {
     this.sqlite = SqliteStorage.getInstance();
@@ -105,6 +106,7 @@ export class UsageTracker {
 
   public record(record: Omit<TokenUsageRecord, 'id' | 'timestamp'>): TokenUsageRecord {
     const entry = this.sqlite.recordUsage(record);
+    this.statsCache.clear();
     this.setLiveTransmission(
       record.profile || record.email,
       record.model,
@@ -131,12 +133,17 @@ export class UsageTracker {
     // Truncate SQLite logs
     try {
       (this.sqlite as any).db.exec('DELETE FROM usage_logs;');
+      this.statsCache.clear();
     } catch (_) {}
   }
 
   public getStats(timeframeMs?: number): UsageStats {
     const now = Date.now();
     const timeframe = timeframeMs || 24 * 60 * 60 * 1000;
+    const cached = this.statsCache.get(timeframe);
+    if (cached && now - cached.timestamp < 1500) {
+      return cached.data;
+    }
     const logs = this.sqlite.getUsageLogs(10000).filter(l => l.timestamp >= now - timeframe);
 
     let totalPromptTokens = 0;
@@ -224,7 +231,7 @@ export class UsageTracker {
     const tokensPerSecond = Math.round(recentTokensLast10s / 10);
     const avgLatencyMs = logs.length > 0 ? Math.round(totalLatency / logs.length) : 0;
 
-    return {
+    const resultStats: UsageStats = {
       totalRequests: logs.length,
       totalTokens: totalPromptTokens + totalCompletionTokens,
       totalPromptTokens,
@@ -236,6 +243,8 @@ export class UsageTracker {
       avgLatencyMs,
       timeSeries
     };
+    this.statsCache.set(timeframe, { data: resultStats, timestamp: now });
+    return resultStats;
   }
 }
 

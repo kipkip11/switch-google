@@ -52,6 +52,7 @@ const dnsManager_1 = require("../mitm/dnsManager");
 const portForwardManager_1 = require("../mitm/portForwardManager");
 const modelFallback_1 = require("../services/modelFallback");
 const externalProviders_1 = require("../services/externalProviders");
+const tunnelManager_1 = require("../services/tunnelManager");
 const undici_1 = require("undici");
 const dns_1 = __importDefault(require("dns"));
 // Bỏ qua /etc/hosts cho các request nội bộ từ switch-google tới Google APIs để triệt tiêu loopback khi Direct Link kích hoạt
@@ -134,9 +135,18 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             timeframeMs = 60 * 60 * 1000;
         else if (timeframeParam === '6h')
             timeframeMs = 6 * 60 * 60 * 1000;
+        else if (timeframeParam === 'week' || timeframeParam === '7d')
+            timeframeMs = 7 * 24 * 60 * 60 * 1000;
+        else if (timeframeParam === 'month' || timeframeParam === '30d')
+            timeframeMs = 30 * 24 * 60 * 60 * 1000;
+        else if (timeframeParam === 'year' || timeframeParam === '365d')
+            timeframeMs = 365 * 24 * 60 * 60 * 1000;
         const usageStats = tracker_1.usageTracker.getStats(timeframeMs);
         const recentLogs = tracker_1.usageTracker.getRecentLogs(1);
-        const latestModel = recentLogs[0]?.model || 'gemini-3.8-flash';
+        const activeSystemCombo = manager.getActiveSystemCombo();
+        const latestModel = (activeSystemCombo && (activeSystemCombo.activeModel || activeSystemCombo.models?.[0])) ||
+            recentLogs[0]?.model ||
+            'gemini-3.8-flash';
         const liveTraffic = tracker_1.usageTracker.getLiveTraffic();
         const rotationConfig = rotator.getRotationConfig();
         const ports = rotator.getPortStatuses().map(p => ({
@@ -178,20 +188,51 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             ms = 60 * 60 * 1000;
         else if (tf === '6h')
             ms = 6 * 60 * 60 * 1000;
+        else if (tf === 'week' || tf === '7d')
+            ms = 7 * 24 * 60 * 60 * 1000;
+        else if (tf === 'month' || tf === '30d')
+            ms = 30 * 24 * 60 * 60 * 1000;
+        else if (tf === 'year' || tf === '365d')
+            ms = 365 * 24 * 60 * 60 * 1000;
         res.json(tracker_1.usageTracker.getStats(ms));
     });
     // Analytics summary grouped by day, month, year, or model
     app.get('/api/analytics/summary', (req, res) => {
         try {
-            const period = req.query.period || 'day'; // 'day' | 'month' | 'year' | 'hour'
+            const period = req.query.period || 'day'; // 'day' | 'month' | 'year' | 'hour' | 'week'
             const sqlite = manager.getStorage().getSqlite();
-            const allLogs = sqlite.getUsageLogs(100000);
+            let allLogs = sqlite.getUsageLogs(100000);
+            const now = new Date();
+            // Lọc log theo đúng khung thời gian người dùng chọn
+            let filterStart = 0;
+            if (period === 'hour') {
+                // 24 giờ qua để hiển thị từng giờ
+                filterStart = Date.now() - 24 * 3600 * 1000;
+            }
+            else if (period === 'day') {
+                // 30 ngày qua để hiển thị từng ngày
+                filterStart = Date.now() - 30 * 24 * 3600 * 1000;
+            }
+            else if (period === 'week') {
+                // 12 tuần qua (khoảng 84 ngày)
+                filterStart = Date.now() - 84 * 24 * 3600 * 1000;
+            }
+            else if (period === 'month') {
+                // 12 tháng qua (khoảng 365 ngày)
+                filterStart = Date.now() - 365 * 24 * 3600 * 1000;
+            }
+            else if (period === 'year') {
+                // 5 năm qua
+                filterStart = Date.now() - 5 * 365 * 24 * 3600 * 1000;
+            }
+            if (filterStart > 0) {
+                allLogs = allLogs.filter((l) => l.timestamp >= filterStart);
+            }
             // Phân nhóm theo period
             const timelineMap = {};
             const modelMap = {};
             const accountMap = {};
             const modelAccountMap = {};
-            const now = new Date();
             allLogs.forEach((log) => {
                 const d = new Date(log.timestamp);
                 let key = '';
@@ -201,6 +242,13 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                 else if (period === 'month') {
                     const m = String(d.getMonth() + 1).padStart(2, '0');
                     key = `${d.getFullYear()}-${m}`;
+                }
+                else if (period === 'week') {
+                    // Tính tuần trong năm (ISO Week hoặc tuần theo ngày đầu tuần)
+                    const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+                    const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+                    const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                    key = `Tuần ${weekNum} (${d.getFullYear()})`;
                 }
                 else if (period === 'hour') {
                     const h = String(d.getHours()).padStart(2, '0');
@@ -244,8 +292,24 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                 total: timelineMap[k].total,
                 requests: timelineMap[k].requests
             }));
-            // Quota status ước tính cho từng model
+            // Quota status ước tính cho từng model theo thời gian thực 24h qua
+            const now24h = Date.now() - 24 * 3600 * 1000;
+            const recent24hLogs = sqlite.getUsageLogs(100000).filter(l => l.timestamp >= now24h);
+            const recent24hModelMap = {};
+            const recent24hModelAccountMap = {};
+            recent24hLogs.forEach((log) => {
+                const m = log.model || 'unknown';
+                const a = log.profile || 'unknown';
+                recent24hModelMap[m] = (recent24hModelMap[m] || 0) + (log.totalTokens || 0);
+                if (!recent24hModelAccountMap[m])
+                    recent24hModelAccountMap[m] = {};
+                if (!recent24hModelAccountMap[m][a])
+                    recent24hModelAccountMap[m][a] = { totalTokens: 0, requests: 0 };
+                recent24hModelAccountMap[m][a].totalTokens += log.totalTokens || 0;
+                recent24hModelAccountMap[m][a].requests += 1;
+            });
             const totalAllTokens = allLogs.reduce((acc, l) => acc + (l.totalTokens || 0), 0);
+            const totalCostVnd = Math.round((totalAllTokens / 1_000_000) * 9000);
             const activeProfiles = manager.listProfiles().filter(p => !p.isBlockedAntigravity);
             const poolCapacity = Math.max(1, activeProfiles.length);
             const portStatuses = rotator.getPortStatuses();
@@ -254,9 +318,9 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                     let usedTokens = 0;
                     let requests = 0;
                     for (const mk of modelKeys) {
-                        if (modelAccountMap[mk]) {
-                            const stat1 = modelAccountMap[mk][p.profile];
-                            const stat2 = p.email ? modelAccountMap[mk][p.email] : null;
+                        if (recent24hModelAccountMap[mk]) {
+                            const stat1 = recent24hModelAccountMap[mk][p.profile];
+                            const stat2 = p.email ? recent24hModelAccountMap[mk][p.email] : null;
                             if (stat1) {
                                 usedTokens += stat1.totalTokens;
                                 requests += stat1.requests;
@@ -292,7 +356,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                     badge: 'ĐỈNH CAO CODE',
                     color: '#7C3AED',
                     dailyLimit: poolCapacity * 10000000, // 10M per account/day
-                    usedToday: modelMap['claude-3-7-sonnet'] || modelMap['claude-sonnet-5-5-high'] || 0,
+                    usedToday: recent24hModelMap['claude-3-7-sonnet'] || recent24hModelMap['claude-sonnet-5-5-high'] || 0,
                     rpmLimit: poolCapacity * 60,
                     tpmLimit: poolCapacity * 400000,
                     availableAccounts: poolCapacity,
@@ -305,7 +369,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                     badge: 'SIÊU TỐC ĐỘ',
                     color: '#0284C7',
                     dailyLimit: poolCapacity * 50000000, // 50M per account/day
-                    usedToday: modelMap['gemini-3.8-flash'] || modelMap['gemini-3.8-flash-high'] || 0,
+                    usedToday: recent24hModelMap['gemini-3.8-flash'] || recent24hModelMap['gemini-3.8-flash-high'] || 0,
                     rpmLimit: poolCapacity * 120,
                     tpmLimit: poolCapacity * 1000000,
                     availableAccounts: poolCapacity,
@@ -318,7 +382,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                     badge: 'TƯ DUY SÂU & 2M CONTEXT',
                     color: '#D97706',
                     dailyLimit: poolCapacity * 20000000, // 20M per account/day
-                    usedToday: modelMap['gemini-4-argon'] || modelMap['gemini-2.5-pro'] || modelMap['gemini-4-argon-high'] || 0,
+                    usedToday: recent24hModelMap['gemini-4-argon'] || recent24hModelMap['gemini-2.5-pro'] || recent24hModelMap['gemini-4-argon-high'] || 0,
                     rpmLimit: poolCapacity * 60,
                     tpmLimit: poolCapacity * 500000,
                     availableAccounts: poolCapacity,
@@ -329,6 +393,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             res.json({
                 period,
                 totalAllTokens,
+                totalCostVnd,
                 timeline,
                 modelDistribution: modelMap,
                 accountDistribution: accountMap,
@@ -651,6 +716,26 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
             res.status(500).json({ error: err.message });
         }
     });
+    // Subscriptions & Plans Management
+    app.post('/api/profiles/:name/subscription', (req, res) => {
+        try {
+            const { name } = req.params;
+            const { planTier, planExpiresAt } = req.body;
+            const sqlite = manager.getStorage().getSqlite();
+            const prof = sqlite.getProfile(name);
+            if (!prof) {
+                res.status(404).json({ error: 'Tài khoản không tồn tại' });
+                return;
+            }
+            prof.planTier = planTier;
+            prof.planExpiresAt = planExpiresAt;
+            sqlite.saveProfile(prof);
+            res.json({ success: true, profile: prof });
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
     // Virtual API Keys Management
     app.get('/api/keys', (req, res) => {
         res.json({ keys: manager.getApiKeys() });
@@ -680,6 +765,33 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
     app.get('/api/providers', (req, res) => {
         const sqlite = manager.getStorage().getSqlite();
         res.json({ providers: externalProviders_1.ExternalProviderManager.getMaskedProviders(sqlite) });
+    });
+    // Remote & Multi-Device Tunnel Endpoints (Tailscale & Cloudflare)
+    tunnelManager_1.TunnelManager.registerExitHandler();
+    app.get('/api/network/status', (req, res) => {
+        try {
+            const status = tunnelManager_1.TunnelManager.getNetworkStatus(port);
+            res.json(status);
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+    app.post('/api/network/cloudflare/toggle', async (req, res) => {
+        try {
+            const { enabled } = req.body;
+            if (enabled) {
+                const url = await tunnelManager_1.TunnelManager.startCloudflareTunnel(port);
+                res.json({ success: true, running: true, url });
+            }
+            else {
+                tunnelManager_1.TunnelManager.stopCloudflareTunnel();
+                res.json({ success: true, running: false, url: null });
+            }
+        }
+        catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
     app.post('/api/providers/:id', (req, res) => {
         const sqlite = manager.getStorage().getSqlite();

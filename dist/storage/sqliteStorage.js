@@ -608,6 +608,14 @@ class SqliteStorage {
     getAllProfiles() {
         this.ensureValidDb();
         try {
+            this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_tier TEXT;').run();
+        }
+        catch (_) { }
+        try {
+            this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_expires_at TEXT;').run();
+        }
+        catch (_) { }
+        try {
             const rows = this.db.prepare('SELECT * FROM profiles ORDER BY name ASC').all();
             return rows.map((r) => ({
                 name: r.name,
@@ -616,6 +624,8 @@ class SqliteStorage {
                 apiKey: r.api_key || undefined,
                 cookies: r.cookies || undefined,
                 isBlockedAntigravity: r.is_blocked_antigravity === 1,
+                planTier: r.plan_tier || undefined,
+                planExpiresAt: r.plan_expires_at || undefined,
                 tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
                 createdAt: r.created_at,
                 updatedAt: r.updated_at
@@ -633,6 +643,8 @@ class SqliteStorage {
                     apiKey: r.api_key || undefined,
                     cookies: r.cookies || undefined,
                     isBlockedAntigravity: r.is_blocked_antigravity === 1,
+                    planTier: r.plan_tier || undefined,
+                    planExpiresAt: r.plan_expires_at || undefined,
                     tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
                     createdAt: r.created_at,
                     updatedAt: r.updated_at
@@ -693,12 +705,20 @@ class SqliteStorage {
             this.db.prepare('ALTER TABLE profiles ADD COLUMN is_blocked_antigravity INTEGER DEFAULT 0;').run();
         }
         catch (_) { }
+        try {
+            this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_tier TEXT;').run();
+        }
+        catch (_) { }
+        try {
+            this.db.prepare('ALTER TABLE profiles ADD COLUMN plan_expires_at TEXT;').run();
+        }
+        catch (_) { }
         const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO profiles 
-      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at, is_blocked_antigravity)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, email, type, api_key, cookies, tokens_json, created_at, updated_at, is_blocked_antigravity, plan_tier, plan_expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-        stmt.run(profile.name, profile.email || '', profile.type || 'oauth', profile.apiKey || null, profile.cookies || null, JSON.stringify(profile.tokens || {}), profile.createdAt || Date.now(), profile.updatedAt || Date.now(), profile.isBlockedAntigravity ? 1 : 0);
+        stmt.run(profile.name, profile.email || '', profile.type || 'oauth', profile.apiKey || null, profile.cookies || null, JSON.stringify(profile.tokens || {}), profile.createdAt || Date.now(), profile.updatedAt || Date.now(), profile.isBlockedAntigravity ? 1 : 0, profile.planTier || null, profile.planExpiresAt || null);
     }
     deleteProfile(name) {
         const res = this.db.prepare('DELETE FROM profiles WHERE name = ?').run(name);

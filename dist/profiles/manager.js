@@ -107,6 +107,9 @@ class ProfileManager {
                 isExpired,
                 expiresAt,
                 isBlockedAntigravity: prof.isBlockedAntigravity || false,
+                planTier: prof.planTier,
+                planExpiresAt: prof.planExpiresAt,
+                tokens: prof.tokens,
                 createdAt: new Date(prof.createdAt).toLocaleString()
             });
         }

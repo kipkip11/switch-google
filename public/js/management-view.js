@@ -119,7 +119,7 @@
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="badge badge-neutral">${esc((c.strategy || 'fallback').toUpperCase())}</span>
+                <span class="badge ${c.strategy === 'smart-routing' ? 'badge-primary' : 'badge-neutral'}">${esc((c.strategy || 'fallback').toUpperCase())}</span>
                 <button class="btn btn-xs" onclick="openEditComboModal(decodeURIComponent('${safeId}'))">Sửa</button>
               </div>
             </div>
@@ -169,6 +169,11 @@
       if (res.ok) {
         window.SG.toast(`✓ Đã chọn sử dụng model [${model}]`);
         window.fetchCombos();
+        // Đồng bộ ngay nhãn model trên Switch LCM & Topology Hub
+        const lcmModelEl = document.getElementById('lcm-model-name');
+        const topoModelBadge = document.getElementById('topo-active-model-badge');
+        if (lcmModelEl) lcmModelEl.textContent = model;
+        if (topoModelBadge) topoModelBadge.textContent = model;
       } else {
         const err = await res.json();
         window.SG.toast(err.error || 'Không thể chọn model', 'error');
@@ -635,6 +640,98 @@
     const defaultCmd = 'sudo pfctl -a com.apple/switchgoogle -F all';
     const cmd = window.SG.mitmInfo.disablePortForwardCommand || defaultCmd;
     window.SG.copyText(cmd, 'Đã sao chép lệnh hủy Port Forwarding');
+  };
+
+  /* ========================================================================
+     REMOTE & MULTI-DEVICE (TAILSCALE & CLOUDFLARE TUNNEL)
+     ======================================================================== */
+  let cloudflarePublicUrl = null;
+
+  window.fetchNetworkStatus = async function () {
+    try {
+      const res = await fetch('/api/network/status');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Cập nhật Tailscale IP
+      const tsBadge = document.getElementById('remote-tailscale-badge');
+      const tsIpBadge = document.getElementById('remote-ts-ip-badge');
+      const tsBox = document.getElementById('remote-ts-base-url');
+
+      if (data.tailscale && data.tailscale.ip) {
+        if (tsBadge) { tsBadge.textContent = 'Tailscale Active'; tsBadge.className = 'badge badge-success'; }
+        if (tsIpBadge) tsIpBadge.textContent = data.tailscale.ip;
+        if (tsBox) tsBox.textContent = `http://${data.tailscale.ip}:1909/v1`;
+      } else {
+        if (tsBadge) { tsBadge.textContent = 'Tailscale Offline'; tsBadge.className = 'badge badge-neutral'; }
+        if (tsIpBadge) tsIpBadge.textContent = 'Chưa kết nối';
+      }
+
+      // Cập nhật Cloudflare Tunnel
+      const toggle = document.getElementById('toggle-cf-tunnel');
+      const cfBox = document.getElementById('remote-cf-url-box');
+      const cfCopyBtn = document.getElementById('btn-copy-cf');
+
+      if (data.cloudflare && data.cloudflare.running && data.cloudflare.url) {
+        cloudflarePublicUrl = data.cloudflare.url;
+        if (toggle) toggle.checked = true;
+        if (cfBox) {
+          cfBox.textContent = `${data.cloudflare.url}/v1`;
+          cfBox.style.color = '#10B981';
+        }
+        if (cfCopyBtn) cfCopyBtn.disabled = false;
+      } else {
+        cloudflarePublicUrl = null;
+        if (toggle) toggle.checked = false;
+        if (cfBox) {
+          cfBox.textContent = 'Chưa kích hoạt Cloudflare Tunnel';
+          cfBox.style.color = 'var(--text-muted)';
+        }
+        if (cfCopyBtn) cfCopyBtn.disabled = true;
+      }
+    } catch (_) {}
+  };
+
+  window.toggleCloudflareTunnel = async function (enabled) {
+    const cfBox = document.getElementById('remote-cf-url-box');
+    const cfCopyBtn = document.getElementById('btn-copy-cf');
+    if (cfBox) cfBox.textContent = enabled ? '⏳ Đang khởi tạo đường truyền Cloudflare...' : 'Chưa kích hoạt Cloudflare Tunnel';
+
+    try {
+      const res = await fetch('/api/network/cloudflare/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lỗi bật/tắt Cloudflare Tunnel');
+
+      if (data.running && data.url) {
+        cloudflarePublicUrl = data.url;
+        if (cfBox) {
+          cfBox.textContent = `${data.url}/v1`;
+          cfBox.style.color = '#10B981';
+        }
+        if (cfCopyBtn) cfCopyBtn.disabled = false;
+        alert(`🎉 Đã kích hoạt Cloudflare Tunnel thành công!\nURL: ${data.url}`);
+      } else {
+        cloudflarePublicUrl = null;
+        if (cfBox) {
+          cfBox.textContent = 'Chưa kích hoạt Cloudflare Tunnel';
+          cfBox.style.color = 'var(--text-muted)';
+        }
+        if (cfCopyBtn) cfCopyBtn.disabled = true;
+      }
+    } catch (err) {
+      alert(`Lỗi: ${err.message}`);
+      window.fetchNetworkStatus();
+    }
+  };
+
+  window.copyCloudflareUrl = function () {
+    if (cloudflarePublicUrl) {
+      window.SG.copyText(`${cloudflarePublicUrl}/v1`, 'Đã sao chép Cloudflare Public URL');
+    }
   };
 
   /* ========================================================================

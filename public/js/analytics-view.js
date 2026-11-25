@@ -23,11 +23,19 @@
 
   window.switchAnalyticsPeriod = function (period) {
     window.SG.currentAnalyticsPeriod = period;
-    ['hour', 'day', 'month', 'year'].forEach((p) => {
+    ['hour', 'day', 'week', 'month', 'year'].forEach((p) => {
       const btn = document.getElementById(`tf-btn-${p}`);
       if (btn) btn.classList.toggle('active', p === period);
     });
-    window.loadDetailedAnalytics();
+    // Đồng bộ lại realtime timeframe tương ứng
+    if (period === 'hour') window.SG.currentTimeframe = '1h';
+    else if (period === 'day') window.SG.currentTimeframe = '24h';
+    else if (period === 'week') window.SG.currentTimeframe = 'week';
+    else if (period === 'month') window.SG.currentTimeframe = 'month';
+    else if (period === 'year') window.SG.currentTimeframe = 'year';
+    else window.SG.currentTimeframe = '24h';
+
+    window.fetchAnalyticsData();
   };
 
   window.fetchAnalyticsData = async function () {
@@ -74,11 +82,21 @@
   window.loadDetailedAnalytics = async function () {
     try {
       const res = await fetch(
-        `/api/analytics/summary?period=${encodeURIComponent(window.SG.currentAnalyticsPeriod)}`
+        `/api/analytics/summary?period=${encodeURIComponent(window.SG.currentAnalyticsPeriod || 'day')}`
       );
       if (!res.ok) return;
       const data = await res.json();
       lastSummaryData = data;
+
+      // Cập nhật Thẻ Chi Phí Token VNĐ
+      const costEl = document.getElementById('hud-total-cost-vnd');
+      const costTokEl = document.getElementById('hud-total-cost-tokens');
+      if (costEl && costTokEl) {
+        const totalTok = data.totalAllTokens || 0;
+        const totalVnd = data.totalCostVnd || Math.round((totalTok / 1_000_000) * 9000);
+        costEl.textContent = `${totalVnd.toLocaleString('vi-VN')} đ`;
+        costTokEl.textContent = `${window.SG.formatTokens(totalTok)} tokens đã dùng`;
+      }
 
       drawTimelineChartSummary(data.timeline || []);
       drawModelBarChart(data.modelDistribution || {});

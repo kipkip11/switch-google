@@ -9,6 +9,9 @@ export interface ProfileSummary {
   isExpired: boolean;
   expiresAt: string;
   isBlockedAntigravity?: boolean;
+  planTier?: string;
+  planExpiresAt?: string;
+  tokens?: TokenData;
   createdAt: string;
 }
 
@@ -45,11 +48,11 @@ export class ProfileManager {
     return this.storage.getCombos();
   }
 
-  public createCombo(name: string, strategy: 'fallback' | 'round-robin', models: string[]): ModelCombo {
+  public createCombo(name: string, strategy: 'fallback' | 'round-robin' | 'smart-routing', models: string[]): ModelCombo {
     return this.storage.createCombo(name, strategy, models);
   }
 
-  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin'; models?: string[] }): ModelCombo | null {
+  public updateCombo(id: string, updates: { name?: string; strategy?: 'fallback' | 'round-robin' | 'smart-routing'; models?: string[] }): ModelCombo | null {
     return this.storage.updateCombo(id, updates);
   }
 
@@ -101,6 +104,9 @@ export class ProfileManager {
         isExpired,
         expiresAt,
         isBlockedAntigravity: prof.isBlockedAntigravity || false,
+        planTier: prof.planTier,
+        planExpiresAt: prof.planExpiresAt,
+        tokens: prof.tokens,
         createdAt: new Date(prof.createdAt).toLocaleString()
       });
     }

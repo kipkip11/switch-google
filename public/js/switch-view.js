@@ -145,8 +145,11 @@
     const volSub = document.getElementById('sg-volume-sub');
     const totalTok = uplink.totalTokens || usageStats.totalTokens || 0;
     const totalReq = uplink.totalRequests || usageStats.totalRequests || 0;
+    const costVnd = Math.round((totalTok / 1_000_000) * 9000);
+    const vndFmt = costVnd.toLocaleString('vi-VN') + ' đ';
+
     if (volVal) volVal.textContent = window.SG.formatTokens(totalTok);
-    if (volSub) volSub.textContent = `${Number(totalReq).toLocaleString()} requests (24h)`;
+    if (volSub) volSub.textContent = `${Number(totalReq).toLocaleString()} reqs (~${vndFmt})`;
   }
 
   /* --- Render UniFi Pro Max Etherlighting Switch --- */
@@ -166,7 +169,8 @@
 
     if (sfpVal) {
       const sumTok = ports.reduce((acc, p) => acc + (p.totalTokens || 0), 0);
-      sfpVal.textContent = window.SG.formatTokens(sumTok);
+      const sumCostVnd = Math.round((sumTok / 1_000_000) * 9000);
+      sfpVal.innerHTML = `${window.SG.formatTokens(sumTok)} <span style="font-size:0.65rem; color:#10B981; font-weight:normal; display:block;">~${sumCostVnd.toLocaleString('vi-VN')} đ</span>`;
     }
 
     const activeMatch =
@@ -248,6 +252,9 @@
 
         const safeProfile = window.SG.encodeArg(p.profile);
 
+        const costVnd = p.costVnd || Math.round(((p.totalTokens || 0) / 1_000_000) * 9000);
+        const costVndStr = costVnd > 0 ? (costVnd >= 1000 ? `${(costVnd / 1000).toFixed(1)}k đ` : `${costVnd} đ`) : '0 đ';
+
         return `
           <button
             type="button"
@@ -270,7 +277,7 @@
 
             <div class="ether-tok">
               <span>${fmt(p.totalTokens || 0)}</span>
-              <span>${Number(p.totalRequests || 0)}r</span>
+              <span style="color: #10B981; font-weight: 600;">${costVndStr}</span>
             </div>
 
             <div class="ether-glow-bar" aria-hidden="true"></div>

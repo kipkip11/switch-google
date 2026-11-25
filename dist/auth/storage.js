@@ -15,6 +15,7 @@ class ProfileStorage {
     storageFile;
     keyFile;
     encryptionKey;
+    memCache = null;
     constructor(customBaseDir) {
         this.baseDir = customBaseDir || path_1.default.join(os_1.default.homedir(), '.switch-google');
         if (!fs_1.default.existsSync(this.baseDir)) {
@@ -61,7 +62,14 @@ class ProfileStorage {
     close() {
         this.sqlite.close();
     }
+    invalidateCache() {
+        this.memCache = null;
+    }
     load() {
+        const now = Date.now();
+        if (this.memCache && now - this.memCache.timestamp < 2000) {
+            return this.memCache.data;
+        }
         const profilesList = this.sqlite.getAllProfiles();
         const profiles = {};
         for (const p of profilesList) {
@@ -70,14 +78,17 @@ class ProfileStorage {
         const activeProfile = this.sqlite.getActiveProfile();
         const apiKeys = this.sqlite.getApiKeys();
         const combos = this.sqlite.getCombos();
-        return {
+        const data = {
             activeProfile,
             profiles,
             apiKeys,
             combos
         };
+        this.memCache = { data, timestamp: now };
+        return data;
     }
     save(data) {
+        this.memCache = null;
         data.apiKeys = data.apiKeys || [];
         data.combos = data.combos || [];
         // 1. Lưu vào SQLite
@@ -129,69 +140,90 @@ class ProfileStorage {
         catch (_) { }
     }
     getApiKeys() {
-        return this.sqlite.getApiKeys();
+        return this.load().apiKeys || [];
     }
     createApiKey(name) {
         const key = this.sqlite.createApiKey(name);
-        // sync encrypted json
+        this.invalidateCache();
         this.save(this.load());
         return key;
     }
     deleteApiKey(id) {
         const res = this.sqlite.deleteApiKey(id);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
+    lastTouchMap = new Map();
     touchApiKey(keyString) {
-        this.sqlite.touchApiKey(keyString);
+        const now = Date.now();
+        const last = this.lastTouchMap.get(keyString) || 0;
+        // Chỉ ghi xuống SQLite tối đa 1 lần mỗi 30 giây cho mỗi key để triệt tiêu độ trễ Disk I/O trên luồng chính
+        if (now - last > 30000) {
+            this.lastTouchMap.set(keyString, now);
+            setImmediate(() => {
+                try {
+                    this.sqlite.touchApiKey(keyString);
+                }
+                catch (_) { }
+            });
+        }
     }
     getCombos() {
-        return this.sqlite.getCombos();
+        return this.load().combos || [];
     }
     createCombo(name, strategy, models) {
         const combo = this.sqlite.createCombo(name, strategy, models);
+        this.invalidateCache();
         this.save(this.load());
         return combo;
     }
     updateCombo(id, updates) {
         const res = this.sqlite.updateCombo(id, updates);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     addModelToCombo(comboId, model) {
         const res = this.sqlite.addModelToCombo(comboId, model);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     removeModelFromCombo(comboId, model) {
         const res = this.sqlite.removeModelFromCombo(comboId, model);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     deleteCombo(id) {
         const res = this.sqlite.deleteCombo(id);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     setActiveModelInCombo(comboId, model) {
         const res = this.sqlite.setActiveModelInCombo(comboId, model);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     setSystemActiveCombo(comboId, active = true) {
         const res = this.sqlite.setSystemActiveCombo(comboId, active);
+        this.invalidateCache();
         if (res)
             this.save(this.load());
         return res;
     }
     getActiveSystemCombo() {
-        return this.sqlite.getActiveSystemCombo();
+        const combos = this.load().combos || [];
+        return combos.find((c) => c.isActive) || null;
     }
     getStorageDirectory() {
         return this.baseDir;
