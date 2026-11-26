@@ -320,17 +320,17 @@ export class ProfileStorage {
     const jsonStr = JSON.stringify(payload, null, 2);
     fs.writeFileSync(filePath, jsonStr, { mode: 0o600 });
 
-    // Giữ tối đa 20 bản snapshot gần nhất để tiết kiệm dung lượng ổ cứng
+    // Giữ tối đa 15 bản snapshot tự động (auto- / pre-) gần nhất; KHÔNG tự động xóa các bản manual của User (SPEC-007 Điều kiện 4)
     try {
       const files = fs.readdirSync(this.getBackupDir())
-        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
+        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json') && !f.endsWith('-manual.json'))
         .map(f => ({
           name: f,
           fullPath: path.join(this.getBackupDir(), f),
           mtime: fs.statSync(path.join(this.getBackupDir(), f)).mtimeMs
         }))
         .sort((a, b) => b.mtime - a.mtime);
-      for (const old of files.slice(20)) {
+      for (const old of files.slice(15)) {
         try { fs.unlinkSync(old.fullPath); } catch (_) {}
       }
     } catch (_) {}
@@ -513,19 +513,26 @@ export class ProfileStorage {
       current.activeProfile = backupData.activeProfile;
     }
     if (Array.isArray(backupData.apiKeys)) {
+      const keyMap = new Map<string, any>();
+      for (const k of current.apiKeys || []) keyMap.set(k.id, k);
       for (const k of backupData.apiKeys) {
         this.sqlite.saveApiKey(k);
+        keyMap.set(k.id, k);
       }
-      current.apiKeys = backupData.apiKeys;
+      current.apiKeys = Array.from(keyMap.values());
     }
     if (Array.isArray(backupData.combos)) {
+      const comboMap = new Map<string, any>();
+      for (const c of current.combos || []) comboMap.set(c.id, c);
       for (const c of backupData.combos) {
         this.sqlite.saveCombo(c);
+        comboMap.set(c.id, c);
       }
-      current.combos = backupData.combos;
+      current.combos = Array.from(comboMap.values());
     }
 
     this.save(current);
+    this.invalidateCache();
     return importedCount;
   }
 
@@ -534,6 +541,10 @@ export class ProfileStorage {
   }
 
   public importSqliteBuffer(buffer: Buffer): void {
+    try {
+      this.createLocalSnapshot('auto-pre-restore-sqlite');
+    } catch (_) {}
     this.sqlite.importDatabaseBuffer(buffer);
+    this.invalidateCache();
   }
 }

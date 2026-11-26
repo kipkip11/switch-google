@@ -503,7 +503,23 @@ WantedBy=default.target`;
       const latestSha = commitData.sha || '';
       const latestCommit = latestSha ? latestSha.slice(0, 7) : '';
       const latestMessage = commitData.commit?.message?.split('\n')[0] || '';
-      const hasUpdate = Boolean(latestCommit && currentCommit !== 'unknown' && latestCommit !== currentCommit);
+      let isLocalAheadOrContainsRemote = false;
+      if (latestSha && latestCommit && latestCommit !== currentCommit) {
+        try {
+          execSync(`git merge-base --is-ancestor ${latestSha} HEAD`, {
+            cwd: this.appRoot,
+            stdio: 'ignore',
+            windowsHide: true
+          });
+          isLocalAheadOrContainsRemote = true;
+        } catch (_) {}
+      }
+      const hasUpdate = Boolean(
+        latestCommit &&
+          currentCommit !== 'unknown' &&
+          latestCommit !== currentCommit &&
+          !isLocalAheadOrContainsRemote
+      );
 
       let ciResult: CiCdCheckResult = {
         passed: false,

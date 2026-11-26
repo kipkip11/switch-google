@@ -370,6 +370,34 @@ function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
 const exhaustedModelsCache = new Map<string, number>();
 
 /**
+ * Chuẩn hóa đọc usageMetadata từ cả top-level lẫn data.response (SPEC-006 B1).
+ * Cộng cả thoughtsTokenCount vào completionTokens để thống kê token/chi phí phản ánh đúng lượng thinking đã tiêu thụ.
+ */
+function extractUsageTokens(data: any): { promptTokens: number; completionTokens: number; thoughtsTokens: number; totalTokens: number } {
+  const usageMeta = data?.usageMetadata || data?.response?.usageMetadata || {};
+  const promptTokens = Number(usageMeta.promptTokenCount) || 0;
+  const candidatesTokens = Number(usageMeta.candidatesTokenCount) || 0;
+  const thoughtsTokens = Number(usageMeta.thoughtsTokenCount) || 0;
+  const completionTokens = candidatesTokens + thoughtsTokens;
+  const totalTokens = Number(usageMeta.totalTokenCount) || (promptTokens + completionTokens);
+  return { promptTokens, completionTokens, thoughtsTokens, totalTokens };
+}
+
+/**
+ * Ánh xạ finishReason của Gemini/CloudCode sang chuẩn OpenAI (SPEC-006 B2).
+ */
+function mapGeminiFinishReason(rawReason?: string, hasToolCalls = false): string {
+  if (hasToolCalls) return 'tool_calls';
+  if (!rawReason) return 'stop';
+  const upper = String(rawReason).toUpperCase();
+  if (upper === 'MAX_TOKENS' || upper === 'LENGTH') return 'length';
+  if (upper === 'SAFETY' || upper === 'RECITATION' || upper === 'BLOCKLIST' || upper === 'PROHIBITED_CONTENT') {
+    return 'content_filter';
+  }
+  return 'stop';
+}
+
+/**
  * Log chẩn đoán cấu trúc upstream theo SPEC-006 Pha A (A2).
  * Mặc định TẮT; chỉ bật khi process.env.SG_DEBUG_UPSTREAM === '1'.
  * Tuyệt đối KHÔNG ghi nội dung text, KHÔNG ghi functionCall.name hay functionCall.args.
@@ -703,15 +731,18 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
               logUpstreamStructure('stream', targetModel, actualModel, geminiBody.generationConfig, data);
               const usageMeta = data.usageMetadata || data.response?.usageMetadata;
               if (usageMeta) {
-                if (usageMeta.promptTokenCount !== undefined) streamPromptTokens = usageMeta.promptTokenCount;
-                if (usageMeta.candidatesTokenCount !== undefined) streamCompletionTokens = usageMeta.candidatesTokenCount;
+                const extracted = extractUsageTokens(data);
+                if (usageMeta.promptTokenCount !== undefined) streamPromptTokens = extracted.promptTokens;
+                if (usageMeta.candidatesTokenCount !== undefined || usageMeta.thoughtsTokenCount !== undefined) {
+                  streamCompletionTokens = extracted.completionTokens;
+                }
               }
 
               const candidate = data.candidates?.[0] || data.response?.candidates?.[0];
               if (!candidate) return;
 
               if (candidate.finishReason) {
-                finalFinishReason = candidate.finishReason.toLowerCase();
+                finalFinishReason = mapGeminiFinishReason(candidate.finishReason, false);
               }
 
               const parts = candidate.content?.parts || [];
@@ -818,7 +849,7 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             sendFirstChunkIfNeeded();
 
             // Final chunk
-            const finishReason = hadToolCalls ? 'tool_calls' : (finalFinishReason === 'stop' ? 'stop' : finalFinishReason);
+            const finishReason = mapGeminiFinishReason(finalFinishReason, hadToolCalls);
             res.write(`data: ${JSON.stringify({
               id: completionId,
               object: 'chat.completion.chunk',
@@ -890,9 +921,8 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             reasoningText = '';
           }
 
-          const usageMeta = data.usageMetadata || data.response?.usageMetadata || {};
-          const promptTokens = usageMeta.promptTokenCount || 0;
-          const completionTokens = usageMeta.candidatesTokenCount || 0;
+          const { promptTokens, completionTokens, totalTokens: nonStreamTotal } = extractUsageTokens(data);
+          const nonStreamFinishReason = mapGeminiFinishReason(candidate.finishReason, toolCalls.length > 0);
 
           res.setHeader('X-Account-Used', accountUsed);
           res.setHeader('X-Model-Used', targetModel);
@@ -919,18 +949,17 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
               {
                 index: 0,
                 message: choiceMessage,
-                finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop'
+                finish_reason: nonStreamFinishReason
               }
             ],
             usage: {
               prompt_tokens: promptTokens,
               completion_tokens: completionTokens,
-              total_tokens: promptTokens + completionTokens
+              total_tokens: nonStreamTotal
             }
           });
 
           // Record token usage
-          const nonStreamTotal = promptTokens + completionTokens;
           usageTracker.record({
             profile: accountUsed,
             email: accountUsed,

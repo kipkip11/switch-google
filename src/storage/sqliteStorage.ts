@@ -1127,6 +1127,22 @@ export class SqliteStorage {
   }
 
   public importDatabaseBuffer(buffer: Buffer): void {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 16) {
+      throw new Error('File SQLite không hợp lệ (kích thước quá nhỏ).');
+    }
+    const header = buffer.subarray(0, 16).toString('utf8');
+    const isSqliteHeader = header === 'SQLite format 3\0';
+    let isFallbackJson = false;
+    if (!isSqliteHeader && !DatabaseSyncClass) {
+      try {
+        const parsed = JSON.parse(buffer.toString('utf8'));
+        isFallbackJson = Boolean(parsed && typeof parsed === 'object');
+      } catch (_) {}
+    }
+    if (!isSqliteHeader && !isFallbackJson) {
+      throw new Error('File không đúng định dạng cơ sở dữ liệu SQLite 3 hợp lệ.');
+    }
+
     try {
       this.db.close();
     } catch (_) {}
@@ -1134,9 +1150,18 @@ export class SqliteStorage {
     const backupOld = this.dbPath + '.bak.' + Date.now();
     if (fs.existsSync(this.dbPath)) {
       fs.copyFileSync(this.dbPath, backupOld);
+      try { fs.chmodSync(backupOld, 0o600); } catch (_) {}
     }
 
-    fs.writeFileSync(this.dbPath, buffer);
+    // Xóa sạch file -wal và -shm cũ để tránh lỗi "database disk image is malformed" (SPEC-007 Điều kiện 1)
+    for (const suffix of ['-wal', '-shm']) {
+      const walPath = this.dbPath + suffix;
+      if (fs.existsSync(walPath)) {
+        try { fs.unlinkSync(walPath); } catch (_) {}
+      }
+    }
+
+    fs.writeFileSync(this.dbPath, buffer, { mode: 0o600 });
     if (DatabaseSyncClass) {
       this.db = new DatabaseSyncClass(this.dbPath);
     } else {

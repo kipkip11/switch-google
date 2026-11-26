@@ -100,6 +100,7 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
     const fallbackMgr = new modelFallback_1.ModelFallbackManager(manager);
     app.use(express_1.default.json({ limit: '100mb' }));
     app.use(express_1.default.urlencoded({ extended: true, limit: '100mb' }));
+    app.use('/api/backup/sqlite', express_1.default.raw({ type: ['application/vnd.sqlite3', 'application/octet-stream'], limit: '100mb' }));
     // Serve static files for Web UI
     const publicPaths = [
         path_1.default.join(__dirname, '../../public'),

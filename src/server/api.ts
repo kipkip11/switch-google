@@ -61,6 +61,7 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+  app.use('/api/backup/sqlite', express.raw({ type: ['application/vnd.sqlite3', 'application/octet-stream'], limit: '100mb' }));
 
   // Serve static files for Web UI
   const publicPaths = [
