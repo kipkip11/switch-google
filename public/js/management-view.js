@@ -928,12 +928,20 @@
     reader.onload = async (e) => {
       try {
         const json = JSON.parse(e.target.result);
-        if (!confirm(`Phục hồi dữ liệu từ file JSON "${file.name}"?`)) return;
-        window.SG.toast('Đang phục hồi dữ liệu JSON...');
-        const res = await fetch('/api/backup/import', {
+        const incomingProfiles = json?.storage?.profiles || json?.data?.profiles || json?.profiles || {};
+        const incomingCount = Object.keys(incomingProfiles).length;
+        if (incomingCount === 0) {
+          return window.SG.toast('File sao lưu không chứa tài khoản hợp lệ.', 'error');
+        }
+
+        const isClean = confirm(`Phát hiện ${incomingCount} tài khoản trong file sao lưu "${file.name}".\n\n- Bấm OK để THAY THẾ HOÀN TOÀN (chuyển trọn gói sang máy này).\n- Bấm Cancel để GỘP THÊM vào các tài khoản hiện tại.`);
+        const mode = isClean ? 'clean' : 'merge';
+
+        window.SG.toast(`Đang nạp ${incomingCount} tài khoản (chế độ ${mode === 'clean' ? 'thay thế' : 'gộp'})...`);
+        const res = await fetch(`/api/backup/import?mode=${mode}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(json)
+          body: JSON.stringify({ ...json, mode })
         });
         const data = await res.json();
         if (res.ok) {
@@ -941,7 +949,9 @@
           window.fetchSwitchStatus?.();
           window.fetchApiKeys?.();
           window.fetchCombos?.();
+          window.fetchSubscriptionsList?.();
           window.fetchAuditLogs?.();
+          window.fetchLocalSnapshots?.();
         } else {
           window.SG.toast(data.error || 'Lỗi phục hồi JSON', 'error');
         }

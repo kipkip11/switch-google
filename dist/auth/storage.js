@@ -353,52 +353,54 @@ class ProfileStorage {
             storage: data,
             settings
         });
-        if (passphrase && passphrase.trim().length > 0) {
-            const salt = crypto_1.default.randomBytes(16);
-            const key = crypto_1.default.scryptSync(passphrase.trim(), salt, 32);
-            const iv = crypto_1.default.randomBytes(12);
-            const cipher = crypto_1.default.createCipheriv('aes-256-gcm', key, iv);
-            let enc = cipher.update(plainPayload, 'utf8', 'hex');
-            enc += cipher.final('hex');
-            const tag = cipher.getAuthTag().toString('hex');
-            return JSON.stringify({
-                app: 'switch-google-encrypted-backup',
-                version: '1.3.3',
-                cipher: 'aes-256-gcm',
-                kdf: 'scrypt',
-                exportedAt: new Date().toISOString(),
-                salt: salt.toString('hex'),
-                iv: iv.toString('hex'),
-                tag,
-                ciphertext: enc
-            }, null, 2);
-        }
+        const effectivePass = (passphrase && passphrase.trim().length > 0) ? passphrase.trim() : 'switch-google-portable-key-default';
+        const salt = crypto_1.default.randomBytes(16);
+        const key = crypto_1.default.scryptSync(effectivePass, salt, 32);
+        const iv = crypto_1.default.randomBytes(12);
+        const cipher = crypto_1.default.createCipheriv('aes-256-gcm', key, iv);
+        let enc = cipher.update(plainPayload, 'utf8', 'hex');
+        enc += cipher.final('hex');
+        const tag = cipher.getAuthTag().toString('hex');
         return JSON.stringify({
             app: 'switch-google-encrypted-backup',
             version: '1.3.3',
-            cipher: 'aes-256-gcm-masterkey',
+            cipher: 'aes-256-gcm',
+            kdf: 'scrypt',
+            isDefaultPass: effectivePass === 'switch-google-portable-key-default',
             exportedAt: new Date().toISOString(),
-            ciphertext: this.encrypt(plainPayload)
+            salt: salt.toString('hex'),
+            iv: iv.toString('hex'),
+            tag,
+            ciphertext: enc
         }, null, 2);
     }
     importEncryptedBackup(rawContent, passphrase) {
         const parsed = JSON.parse(rawContent);
         let decryptedJson = '';
         if (parsed.kdf === 'scrypt') {
-            if (!passphrase || !passphrase.trim()) {
+            let pass = passphrase ? passphrase.trim() : '';
+            if (!pass && parsed.isDefaultPass) {
+                pass = 'switch-google-portable-key-default';
+            }
+            if (!pass) {
                 throw new Error('Bản sao lưu này được bảo vệ bằng mật khẩu. Vui lòng nhập mật khẩu giải mã.');
             }
             const salt = Buffer.from(parsed.salt, 'hex');
             const iv = Buffer.from(parsed.iv, 'hex');
             const tag = Buffer.from(parsed.tag, 'hex');
-            const key = crypto_1.default.scryptSync(passphrase.trim(), salt, 32);
+            const key = crypto_1.default.scryptSync(pass, salt, 32);
             const decipher = crypto_1.default.createDecipheriv('aes-256-gcm', key, iv);
             decipher.setAuthTag(tag);
             decryptedJson = decipher.update(parsed.ciphertext, 'hex', 'utf8');
             decryptedJson += decipher.final('utf8');
         }
         else if (parsed.cipher === 'aes-256-gcm-masterkey' && parsed.ciphertext) {
-            decryptedJson = this.decrypt(parsed.ciphertext);
+            try {
+                decryptedJson = this.decrypt(parsed.ciphertext);
+            }
+            catch (_) {
+                throw new Error('Bản sao lưu này được mã hóa bằng master.key của máy khác. Vui lòng dùng tính năng xuất file JSON tiêu chuẩn từ máy gốc để chuyển sang máy này.');
+            }
         }
         else {
             throw new Error('Định dạng file sao lưu mã hóa không hợp lệ.');
@@ -428,11 +430,20 @@ class ProfileStorage {
         };
         return JSON.stringify(backup, null, 2);
     }
-    importBackup(backupJson) {
+    importBackup(backupJson, mode = 'merge') {
         const parsed = JSON.parse(backupJson);
         const backupData = parsed.data || parsed.storage || parsed;
         let importedCount = 0;
-        const current = this.load();
+        const current = mode === 'clean'
+            ? { activeProfile: null, profiles: {}, apiKeys: [], combos: [] }
+            : this.load();
+        if (mode === 'clean') {
+            // Xóa sạch profiles cũ trong SQLite nếu chọn chế độ thay thế hoàn toàn
+            for (const oldP of this.sqlite.getAllProfiles()) {
+                this.sqlite.deleteProfile(oldP.name);
+            }
+            current.profiles = {};
+        }
         if (backupData.profiles) {
             for (const prof of Object.values(backupData.profiles)) {
                 this.sqlite.saveProfile(prof);
@@ -446,8 +457,10 @@ class ProfileStorage {
         }
         if (Array.isArray(backupData.apiKeys)) {
             const keyMap = new Map();
-            for (const k of current.apiKeys || [])
-                keyMap.set(k.id, k);
+            if (mode !== 'clean') {
+                for (const k of current.apiKeys || [])
+                    keyMap.set(k.id, k);
+            }
             for (const k of backupData.apiKeys) {
                 this.sqlite.saveApiKey(k);
                 keyMap.set(k.id, k);
@@ -456,8 +469,10 @@ class ProfileStorage {
         }
         if (Array.isArray(backupData.combos)) {
             const comboMap = new Map();
-            for (const c of current.combos || [])
-                comboMap.set(c.id, c);
+            if (mode !== 'clean') {
+                for (const c of current.combos || [])
+                    comboMap.set(c.id, c);
+            }
             for (const c of backupData.combos) {
                 this.sqlite.saveCombo(c);
                 comboMap.set(c.id, c);

@@ -553,31 +553,9 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                 storage.createLocalSnapshot('pre-import');
             }
             catch (_) { }
+            const mode = (backup.mode === 'clean' || req.query.mode === 'clean') ? 'clean' : 'merge';
+            storage.importBackup(JSON.stringify({ data: storagePayload }), mode);
             const current = storage.load();
-            // Merge profiles (giữ nguyên hoặc cập nhật không làm mất tài khoản cũ)
-            for (const [name, prof] of Object.entries(storagePayload.profiles)) {
-                current.profiles[name] = prof;
-            }
-            if (storagePayload.activeProfile) {
-                current.activeProfile = storagePayload.activeProfile;
-            }
-            if (Array.isArray(storagePayload.apiKeys)) {
-                const keyMap = new Map();
-                for (const k of current.apiKeys || [])
-                    keyMap.set(k.id, k);
-                for (const k of storagePayload.apiKeys)
-                    keyMap.set(k.id, k);
-                current.apiKeys = Array.from(keyMap.values());
-            }
-            if (Array.isArray(storagePayload.combos)) {
-                const comboMap = new Map();
-                for (const c of current.combos || [])
-                    comboMap.set(c.id, c);
-                for (const c of storagePayload.combos)
-                    comboMap.set(c.id, c);
-                current.combos = Array.from(comboMap.values());
-            }
-            storage.save(current);
             // Khôi phục settings (bao gồm external_providers_config, rotation config)
             if (backup.settings && typeof backup.settings === 'object') {
                 const sqlite = storage.getSqlite();
