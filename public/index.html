@@ -189,6 +189,10 @@
           <span class="version-chip" id="app-version-badge">v1.3.1</span>
           <span class="ci-chip" id="app-cicd-badge">CI OK</span>
 
+          <button class="btn btn-sm" onclick="downloadBackup()" title="Sao lưu nhanh danh sách tài khoản ra file JSON">
+            <span>💾 Sao Lưu TK</span>
+          </button>
+
           <button class="btn btn-primary" onclick="openAddModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -738,13 +742,21 @@
                   Theo dõi gói đăng ký (Google Workspace, AI Premium, Free Tier), hạn mức và thời gian hết hạn của từng tài khoản Google trong hệ thống để kịp thời gia hạn hoặc làm mới token.
                 </p>
               </div>
-              <button class="btn btn-secondary btn-sm" onclick="fetchSubscriptionsList()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                </svg>
-                Làm Mới
-              </button>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" onclick="downloadBackup()" title="Xuất sao lưu toàn bộ danh sách tài khoản và gói đăng ký">
+                  💾 Xuất Sao Lưu TK
+                </button>
+                <button class="btn btn-sm" onclick="document.getElementById('file-import-json').click()" title="Khôi phục tài khoản từ file JSON">
+                  📥 Nạp Sao Lưu
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="fetchSubscriptionsList()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                  Làm Mới
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1002,15 +1014,15 @@ coding-agent --model gemini-3.8-flash</pre>
             <div class="card">
               <div class="card-header">
                 <div class="card-title-group">
-                  <h2 class="card-title">Sao Lưu &amp; Phục Hồi Dữ Liệu</h2>
-                  <p class="card-desc">Xuất hoặc khôi phục danh sách tài khoản, Virtual Keys, Combos và lịch sử sử dụng.</p>
+                  <h2 class="card-title">Sao Lưu &amp; Phục Hồi Dữ Liệu Tài Khoản</h2>
+                  <p class="card-desc">Xuất hoặc khôi phục danh sách tài khoản, OAuth Tokens, Cookies, Gói đăng ký, Virtual Keys và Combos.</p>
                 </div>
               </div>
 
               <div class="setting-row">
                 <div class="setting-info">
-                  <div class="setting-title">Sao lưu định dạng JSON</div>
-                  <div class="setting-desc">Tệp JSON gọn nhẹ chứa toàn bộ cấu hình, profiles, API keys và logs gần đây.</div>
+                  <div class="setting-title">Sao lưu định dạng JSON (Tiêu chuẩn)</div>
+                  <div class="setting-desc">Tệp JSON chứa toàn bộ tài khoản đã nhập, cấu hình Gói &amp; Hạn, API keys, Combos và cài đặt hệ thống.</div>
                 </div>
                 <div style="display: flex; gap: 8px;">
                   <button class="btn btn-primary btn-sm" onclick="downloadBackup()">Xuất JSON</button>
@@ -1021,13 +1033,42 @@ coding-agent --model gemini-3.8-flash</pre>
 
               <div class="setting-row">
                 <div class="setting-info">
+                  <div class="setting-title">Sao lưu Bảo mật AES-256-GCM (.enc.json)</div>
+                  <div class="setting-desc">Mã hóa toàn bộ OAuth Refresh Token, Cookie và API Key bằng mật khẩu riêng (Scrypt + AES-256-GCM).</div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <input type="password" id="backup-passphrase-input" class="form-input" placeholder="Mật khẩu mã hóa (tùy chọn)" style="width: 190px; height: 32px; font-size: 0.8rem; padding: 4px 10px;" />
+                  <button class="btn btn-primary btn-sm" onclick="downloadEncryptedBackup()">🔒 Xuất Mã Hóa</button>
+                  <button class="btn btn-sm" onclick="document.getElementById('file-import-encrypted').click()">🔓 Nạp Mã Hóa</button>
+                  <input type="file" id="file-import-encrypted" accept=".json,application/json" onchange="handleEncryptedBackupFile(event)" hidden />
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-info">
                   <div class="setting-title">Cơ sở dữ liệu SQLite (.sqlite)</div>
-                  <div class="setting-desc">Sao lưu toàn vẹn tệp cơ sở dữ liệu nhị phân SQLite để di chuyển sang máy khác.</div>
+                  <div class="setting-desc">Sao lưu toàn vẹn tệp cơ sở dữ liệu nhị phân SQLite để di chuyển nguyên trạng sang máy khác.</div>
                 </div>
                 <div style="display: flex; gap: 8px;">
                   <button class="btn btn-primary btn-sm" onclick="exportSqliteDatabase()">Xuất SQLite</button>
                   <button class="btn btn-sm" onclick="document.getElementById('file-import-sqlite').click()">Nạp SQLite</button>
                   <input type="file" id="file-import-sqlite" accept=".sqlite,.db" onchange="handleSqliteBackupFile(event)" hidden />
+                </div>
+              </div>
+
+              <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="setting-info">
+                    <div class="setting-title">Điểm Khôi Phục Tự Động Tại Máy Chủ (Local Snapshots)</div>
+                    <div class="setting-desc">Hệ thống tự động lưu bản dự phòng tại <code>~/.switch-google/backups/</code> mỗi khi thêm tài khoản mới.</div>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary btn-sm" onclick="createManualSnapshot()">+ Tạo Điểm Lưu Ngay</button>
+                    <button class="btn btn-sm" onclick="fetchLocalSnapshots()">Làm mới</button>
+                  </div>
+                </div>
+                <div id="local-snapshots-list" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; font-size: 0.8rem; background: var(--bg-canvas, rgba(0,0,0,0.02));">
+                  Đang tải danh sách bản sao lưu tự động...
                 </div>
               </div>
             </div>

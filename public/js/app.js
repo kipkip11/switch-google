@@ -188,6 +188,7 @@
       window.fetchNetworkStatus?.();
     } else if (tabKey === 'system') {
       window.checkSystemVersion?.();
+      window.fetchLocalSnapshots?.();
     }
   };
 

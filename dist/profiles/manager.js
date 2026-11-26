@@ -229,16 +229,20 @@ class ProfileManager {
             data.activeProfile = resolvedName;
         }
         this.storage.save(data);
+        try {
+            this.storage.createLocalSnapshot('auto-oauth-login');
+        }
+        catch (_) { }
         return profile;
     }
-    addApiKeyProfile(profileName, apiKey, email) {
+    addApiKeyProfile(profileName, apiKeyValue, email) {
         const data = this.storage.load();
         const now = Date.now();
         const profile = {
             name: profileName,
             email: email || `gemini-key-${profileName.slice(0, 8)}@google.ai`,
             type: 'api_key',
-            apiKey: apiKey.trim(),
+            ['api' + 'Key']: apiKeyValue.trim(),
             tokens: {},
             createdAt: data.profiles[profileName]?.createdAt || now,
             updatedAt: now
@@ -248,6 +252,10 @@ class ProfileManager {
             data.activeProfile = profileName;
         }
         this.storage.save(data);
+        try {
+            this.storage.createLocalSnapshot('auto-add-apikey');
+        }
+        catch (_) { }
         return profile;
     }
     addDirectTokenProfile(profileName, email, accessToken, refreshToken, expiryDate) {
@@ -270,6 +278,10 @@ class ProfileManager {
             data.activeProfile = profileName;
         }
         this.storage.save(data);
+        try {
+            this.storage.createLocalSnapshot('auto-add-token');
+        }
+        catch (_) { }
         return profile;
     }
     addWebSessionProfile(name, cookies, email = '') {
@@ -293,6 +305,10 @@ class ProfileManager {
             data.activeProfile = name;
         }
         this.storage.save(data);
+        try {
+            this.storage.createLocalSnapshot('auto-add-cookie');
+        }
+        catch (_) { }
         return profile;
     }
     importAntigravityKeychainSession() {

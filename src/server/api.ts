@@ -480,13 +480,15 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   app.get('/api/backup/export', (req: Request, res: Response) => {
     try {
       const storageData = manager.getStorage().load();
+      const settings = manager.getStorage().getSqlite().getAllSettings();
       const usageStats = usageTracker.getStats();
       const recentLogs = usageTracker.getRecentLogs(5000);
       const backup = {
         app: 'switch-google',
-        version: '1.0.0',
+        version: '1.3.3',
         exportedAt: new Date().toISOString(),
         storage: storageData,
+        settings,
         usageStats,
         logs: recentLogs
       };
@@ -502,26 +504,48 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
   app.post('/api/backup/import', (req: Request, res: Response) => {
     try {
       const backup = req.body;
-      if (!backup || !backup.storage || !backup.storage.profiles) {
+      const storagePayload = backup?.storage || backup?.data || backup;
+      if (!storagePayload || !storagePayload.profiles) {
         res.status(400).json({ error: 'File sao lưu không hợp lệ hoặc thiếu dữ liệu profiles.' });
         return;
       }
       const storage = manager.getStorage();
+      // Tự động tạo snapshot dự phòng trước khi import để bảo toàn dữ liệu cũ
+      try {
+        storage.createLocalSnapshot('pre-import');
+      } catch (_) {}
+
       const current = storage.load();
-      // Merge profiles
-      for (const [name, prof] of Object.entries(backup.storage.profiles)) {
+      // Merge profiles (giữ nguyên hoặc cập nhật không làm mất tài khoản cũ)
+      for (const [name, prof] of Object.entries(storagePayload.profiles)) {
         current.profiles[name] = prof as any;
       }
-      if (backup.storage.activeProfile) {
-        current.activeProfile = backup.storage.activeProfile;
+      if (storagePayload.activeProfile) {
+        current.activeProfile = storagePayload.activeProfile;
       }
-      if (Array.isArray(backup.storage.apiKeys)) {
-        current.apiKeys = backup.storage.apiKeys;
+      if (Array.isArray(storagePayload.apiKeys)) {
+        const keyMap = new Map<string, any>();
+        for (const k of current.apiKeys || []) keyMap.set(k.id, k);
+        for (const k of storagePayload.apiKeys) keyMap.set(k.id, k);
+        current.apiKeys = Array.from(keyMap.values());
       }
-      if (Array.isArray(backup.storage.combos)) {
-        current.combos = backup.storage.combos;
+      if (Array.isArray(storagePayload.combos)) {
+        const comboMap = new Map<string, any>();
+        for (const c of current.combos || []) comboMap.set(c.id, c);
+        for (const c of storagePayload.combos) comboMap.set(c.id, c);
+        current.combos = Array.from(comboMap.values());
       }
       storage.save(current);
+
+      // Khôi phục settings (bao gồm external_providers_config, rotation config)
+      if (backup.settings && typeof backup.settings === 'object') {
+        const sqlite = storage.getSqlite();
+        for (const [k, v] of Object.entries(backup.settings)) {
+          if (typeof v === 'string') {
+            sqlite.setSetting(k, v);
+          }
+        }
+      }
 
       // Restore logs if any
       if (Array.isArray(backup.logs) && backup.logs.length > 0) {
@@ -532,9 +556,99 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
 
       res.json({
         success: true,
-        message: `Đã phục hồi thành công ${Object.keys(backup.storage.profiles).length} tài khoản!`,
+        message: `Đã phục hồi thành công ${Object.keys(storagePayload.profiles).length} tài khoản (Tổng: ${Object.keys(current.profiles).length} tài khoản)!`,
         totalProfiles: Object.keys(current.profiles).length
       });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Export Encrypted AES-256-GCM Backup (.enc.json)
+  app.post('/api/backup/export-encrypted', (req: Request, res: Response) => {
+    try {
+      const passphrase = typeof req.body?.passphrase === 'string' ? req.body.passphrase : '';
+      const encContent = manager.getStorage().exportEncryptedBackup(passphrase);
+      res.setHeader('Content-Disposition', `attachment; filename=switch-google-accounts-${new Date().toISOString().slice(0, 10)}.enc.json`);
+      res.setHeader('Content-Type', 'application/json');
+      res.send(encContent);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Import Encrypted AES-256-GCM Backup (.enc.json)
+  app.post('/api/backup/import-encrypted', (req: Request, res: Response) => {
+    try {
+      const { encryptedContent, passphrase } = req.body || {};
+      if (!encryptedContent) {
+        res.status(400).json({ error: 'Thiếu nội dung file sao lưu mã hóa.' });
+        return;
+      }
+      try {
+        manager.getStorage().createLocalSnapshot('pre-encrypted-import');
+      } catch (_) {}
+      const rawStr = typeof encryptedContent === 'string' ? encryptedContent : JSON.stringify(encryptedContent);
+      const result = manager.getStorage().importEncryptedBackup(rawStr, passphrase);
+      res.json({
+        success: true,
+        message: `Đã giải mã và khôi phục thành công ${result.restoredProfiles} tài khoản (Tổng: ${result.totalProfiles} tài khoản)!`,
+        ...result
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Giải mã thất bại hoặc sai mật khẩu.' });
+    }
+  });
+
+  // Local Snapshot Management (Auto & Manual Snapshots in ~/.switch-google/backups/)
+  app.get('/api/backup/snapshots', (req: Request, res: Response) => {
+    try {
+      const snapshots = manager.getStorage().listLocalSnapshots();
+      res.json({
+        backupDir: manager.getStorage().getBackupDir(),
+        snapshots
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/backup/snapshots', (req: Request, res: Response) => {
+    try {
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'manual';
+      const snap = manager.getStorage().createLocalSnapshot(reason);
+      res.json({
+        success: true,
+        message: `Đã tạo bản sao lưu nhanh (${snap.profileCount} tài khoản) tại máy chủ!`,
+        snapshot: snap
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/backup/snapshots/restore', (req: Request, res: Response) => {
+    try {
+      const { filename } = req.body || {};
+      if (!filename) {
+        res.status(400).json({ error: 'Thiếu tên file snapshot cần khôi phục.' });
+        return;
+      }
+      const resData = manager.getStorage().restoreLocalSnapshot(filename);
+      res.json({
+        success: true,
+        message: `Đã khôi phục ${resData.restoredProfiles} tài khoản từ bản sao lưu ${filename}!`,
+        ...resData
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/backup/snapshots/:filename', (req: Request, res: Response) => {
+    try {
+      const ok = manager.getStorage().deleteLocalSnapshot(req.params.filename);
+      res.json({ success: ok });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

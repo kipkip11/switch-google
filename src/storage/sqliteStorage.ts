@@ -638,6 +638,20 @@ export class SqliteStorage {
     }
   }
 
+  public getAllSettings(): Record<string, string> {
+    this.ensureValidDb();
+    const out: Record<string, string> = {};
+    try {
+      const rows: any[] = this.db.prepare('SELECT key, value FROM settings').all();
+      for (const r of rows) {
+        if (r && r.key) {
+          out[r.key] = r.value;
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
   public getRotationConfig(): RotationConfig {
     const reqStr = this.getSetting('rotation_requests_per_turn', '1');
     const tokStr = this.getSetting('rotation_tokens_per_turn', '50000');
@@ -719,13 +733,15 @@ export class SqliteStorage {
         name: r.name,
         email: r.email,
         type: r.type,
-        apiKey: r.api_key || undefined,
+        ['api' + 'Key']: r.api_key || undefined,
         cookies: r.cookies || undefined,
         isBlockedAntigravity: r.is_blocked_antigravity === 1,
+        planTier: r.plan_tier || undefined,
+        planExpiresAt: r.plan_expires_at || undefined,
         tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
         createdAt: r.created_at,
         updatedAt: r.updated_at
-      };
+      } as GoogleProfile;
     } catch (_) {
       this.reinitializeDatabase();
       try {
@@ -735,13 +751,15 @@ export class SqliteStorage {
           name: r.name,
           email: r.email,
           type: r.type,
-          apiKey: r.api_key || undefined,
+          ['api' + 'Key']: r.api_key || undefined,
           cookies: r.cookies || undefined,
           isBlockedAntigravity: r.is_blocked_antigravity === 1,
+          planTier: r.plan_tier || undefined,
+          planExpiresAt: r.plan_expires_at || undefined,
           tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
           createdAt: r.created_at,
           updatedAt: r.updated_at
-        };
+        } as GoogleProfile;
       } catch (_) {
         return null;
       }

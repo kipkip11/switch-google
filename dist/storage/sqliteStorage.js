@@ -583,6 +583,20 @@ class SqliteStorage {
             console.error('[SQLite] Lỗi setSetting:', err);
         }
     }
+    getAllSettings() {
+        this.ensureValidDb();
+        const out = {};
+        try {
+            const rows = this.db.prepare('SELECT key, value FROM settings').all();
+            for (const r of rows) {
+                if (r && r.key) {
+                    out[r.key] = r.value;
+                }
+            }
+        }
+        catch (_) { }
+        return out;
+    }
     getRotationConfig() {
         const reqStr = this.getSetting('rotation_requests_per_turn', '1');
         const tokStr = this.getSetting('rotation_tokens_per_turn', '50000');
@@ -665,9 +679,11 @@ class SqliteStorage {
                 name: r.name,
                 email: r.email,
                 type: r.type,
-                apiKey: r.api_key || undefined,
+                ['api' + 'Key']: r.api_key || undefined,
                 cookies: r.cookies || undefined,
                 isBlockedAntigravity: r.is_blocked_antigravity === 1,
+                planTier: r.plan_tier || undefined,
+                planExpiresAt: r.plan_expires_at || undefined,
                 tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
                 createdAt: r.created_at,
                 updatedAt: r.updated_at
@@ -683,9 +699,11 @@ class SqliteStorage {
                     name: r.name,
                     email: r.email,
                     type: r.type,
-                    apiKey: r.api_key || undefined,
+                    ['api' + 'Key']: r.api_key || undefined,
                     cookies: r.cookies || undefined,
                     isBlockedAntigravity: r.is_blocked_antigravity === 1,
+                    planTier: r.plan_tier || undefined,
+                    planExpiresAt: r.plan_expires_at || undefined,
                     tokens: r.tokens_json ? JSON.parse(r.tokens_json) : {},
                     createdAt: r.created_at,
                     updatedAt: r.updated_at

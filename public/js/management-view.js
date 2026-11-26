@@ -989,4 +989,160 @@
     }
     event.target.value = '';
   };
+
+  /* Encrypted AES-256-GCM Backup & Restore */
+  window.downloadEncryptedBackup = async function () {
+    const passInput = document.getElementById('backup-passphrase-input');
+    const passphrase = passInput ? passInput.value.trim() : '';
+    window.SG.toast('Đang mã hóa AES-256-GCM và xuất bản sao lưu tài khoản...');
+    try {
+      const res = await fetch('/api/backup/export-encrypted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase })
+      });
+      if (!res.ok) return window.SG.toast('Lỗi khi xuất file sao lưu mã hóa', 'error');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `switch-google-accounts-${new Date().toISOString().slice(0, 10)}.enc.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      window.SG.toast('Đã tải xuống file sao lưu mã hóa AES-256-GCM (.enc.json)');
+    } catch (_) {
+      window.SG.toast('Lỗi mạng khi xuất sao lưu mã hóa', 'error');
+    }
+  };
+
+  window.handleEncryptedBackupFile = function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const rawText = e.target.result;
+        const parsed = JSON.parse(rawText);
+        const passInput = document.getElementById('backup-passphrase-input');
+        let passphrase = passInput ? passInput.value.trim() : '';
+        if (parsed.kdf === 'scrypt' && !passphrase) {
+          passphrase = prompt('Bản sao lưu này được bảo vệ bằng mật khẩu. Vui lòng nhập mật khẩu giải mã:') || '';
+        }
+        window.SG.toast('Đang giải mã và khôi phục tài khoản...');
+        const res = await fetch('/api/backup/import-encrypted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encryptedContent: rawText, passphrase })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          window.SG.toast(data.message || 'Khôi phục tài khoản mã hóa thành công');
+          window.fetchSwitchStatus?.();
+          window.fetchSubscriptionsList?.();
+          window.fetchCombos?.();
+          window.fetchApiKeys?.();
+          window.fetchLocalSnapshots?.();
+        } else {
+          window.SG.toast(data.error || 'Lỗi giải mã file sao lưu', 'error');
+        }
+      } catch (err) {
+        window.SG.toast(`File sao lưu mã hóa không hợp lệ: ${err.message}`, 'error');
+      }
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  /* Local Snapshots Management */
+  window.fetchLocalSnapshots = async function () {
+    const container = document.getElementById('local-snapshots-list');
+    if (!container) return;
+    try {
+      const res = await fetch('/api/backup/snapshots');
+      const data = await res.json();
+      const list = data.snapshots || [];
+      if (list.length === 0) {
+        container.innerHTML = '<div style="padding: 10px; color: var(--text-muted); text-align: center;">Chưa có bản sao lưu tự động nào tại máy chủ. Bấm "+ Tạo Điểm Lưu Ngay" để lưu.</div>';
+        return;
+      }
+      container.innerHTML = list.map((s) => {
+        const dt = new Date(s.createdAt).toLocaleString('vi-VN');
+        const kb = (s.size / 1024).toFixed(1) + ' KB';
+        const safeName = window.SG.escapeHtml(s.filename);
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--border-color); gap: 8px;">
+            <div style="min-width: 0;">
+              <div style="font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${safeName}</div>
+              <div style="font-size: 0.74rem; color: var(--text-muted);">${dt} · <strong>${s.profileCount} tài khoản</strong> · ${kb} · <span class="badge badge-neutral">${window.SG.escapeHtml(s.reason)}</span></div>
+            </div>
+            <div style="display: flex; gap: 6px; flex-shrink: 0;">
+              <button class="btn btn-primary btn-sm" onclick="restoreSnapshotByName('${window.SG.encodeArg(s.filename)}')">Khôi phục</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteSnapshotByName('${window.SG.encodeArg(s.filename)}')">Xóa</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (_) {
+      container.innerHTML = '<div style="padding: 10px; color: var(--status-err);">Không thể tải danh sách bản sao lưu.</div>';
+    }
+  };
+
+  window.createManualSnapshot = async function () {
+    window.SG.toast('Đang tạo điểm khôi phục tài khoản trên máy chủ...');
+    try {
+      const res = await fetch('/api/backup/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'manual-checkpoint' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.SG.toast(data.message || 'Đã tạo điểm khôi phục thành công');
+        window.fetchLocalSnapshots();
+      } else {
+        window.SG.toast(data.error || 'Lỗi tạo snapshot', 'error');
+      }
+    } catch (_) {
+      window.SG.toast('Lỗi mạng khi tạo snapshot', 'error');
+    }
+  };
+
+  window.restoreSnapshotByName = async function (encodedName) {
+    const filename = decodeURIComponent(encodedName);
+    if (!confirm(`Khôi phục toàn bộ tài khoản từ điểm lưu "${filename}"?`)) return;
+    window.SG.toast('Đang khôi phục dữ liệu tài khoản...');
+    try {
+      const res = await fetch('/api/backup/snapshots/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.SG.toast(data.message || 'Khôi phục thành công');
+        window.fetchSwitchStatus?.();
+        window.fetchSubscriptionsList?.();
+        window.fetchCombos?.();
+        window.fetchApiKeys?.();
+      } else {
+        window.SG.toast(data.error || 'Khôi phục thất bại', 'error');
+      }
+    } catch (_) {
+      window.SG.toast('Lỗi mạng khi khôi phục snapshot', 'error');
+    }
+  };
+
+  window.deleteSnapshotByName = async function (encodedName) {
+    const filename = decodeURIComponent(encodedName);
+    if (!confirm(`Xóa bản sao lưu "${filename}"?`)) return;
+    try {
+      const res = await fetch(`/api/backup/snapshots/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      if (res.ok) {
+        window.SG.toast('Đã xóa bản sao lưu');
+        window.fetchLocalSnapshots();
+      }
+    } catch (_) {}
+  };
 })();

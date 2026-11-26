@@ -293,6 +293,198 @@ export class ProfileStorage {
     return this.baseDir;
   }
 
+  public getBackupDir(): string {
+    const dir = path.join(this.baseDir, 'backups');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    }
+    return dir;
+  }
+
+  public createLocalSnapshot(reason = 'manual'): { filename: string; path: string; size: number; createdAt: number; profileCount: number } {
+    const data = this.load();
+    const settings = this.sqlite.getAllSettings();
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[:.]/g, '-');
+    const safeReason = reason.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filename = `snapshot-${stamp}-${safeReason}.json`;
+    const filePath = path.join(this.getBackupDir(), filename);
+    const payload = {
+      app: 'switch-google',
+      version: '1.3.3',
+      exportedAt: now.toISOString(),
+      reason,
+      storage: data,
+      settings
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    fs.writeFileSync(filePath, jsonStr, { mode: 0o600 });
+
+    // Giữ tối đa 20 bản snapshot gần nhất để tiết kiệm dung lượng ổ cứng
+    try {
+      const files = fs.readdirSync(this.getBackupDir())
+        .filter(f => f.startsWith('snapshot-') && f.endsWith('.json'))
+        .map(f => ({
+          name: f,
+          fullPath: path.join(this.getBackupDir(), f),
+          mtime: fs.statSync(path.join(this.getBackupDir(), f)).mtimeMs
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const old of files.slice(20)) {
+        try { fs.unlinkSync(old.fullPath); } catch (_) {}
+      }
+    } catch (_) {}
+
+    const stat = fs.statSync(filePath);
+    return {
+      filename,
+      path: filePath,
+      size: stat.size,
+      createdAt: stat.mtimeMs,
+      profileCount: Object.keys(data.profiles || {}).length
+    };
+  }
+
+  public listLocalSnapshots(): Array<{ filename: string; size: number; createdAt: number; profileCount: number; reason: string }> {
+    try {
+      const dir = this.getBackupDir();
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+      const list = files.map(f => {
+        const full = path.join(dir, f);
+        const stat = fs.statSync(full);
+        let profileCount = 0;
+        let reason = 'snapshot';
+        try {
+          const parsed = JSON.parse(fs.readFileSync(full, 'utf8'));
+          const profs = parsed?.storage?.profiles || parsed?.data?.profiles || parsed?.profiles || {};
+          profileCount = Object.keys(profs).length;
+          if (parsed?.reason) reason = parsed.reason;
+        } catch (_) {}
+        return {
+          filename: f,
+          size: stat.size,
+          createdAt: stat.mtimeMs,
+          profileCount,
+          reason
+        };
+      });
+      return list.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  public restoreLocalSnapshot(filename: string): { restoredProfiles: number; totalProfiles: number } {
+    const safeName = path.basename(filename);
+    const full = path.join(this.getBackupDir(), safeName);
+    if (!fs.existsSync(full)) {
+      throw new Error('Không tìm thấy bản sao lưu: ' + safeName);
+    }
+    const raw = fs.readFileSync(full, 'utf8');
+    const parsed = JSON.parse(raw);
+    const storageObj = parsed.storage || parsed.data || parsed;
+    const restoredProfiles = this.importBackup(JSON.stringify({ data: storageObj }));
+    if (parsed.settings && typeof parsed.settings === 'object') {
+      for (const [k, v] of Object.entries(parsed.settings)) {
+        if (typeof v === 'string') {
+          this.sqlite.setSetting(k, v);
+        }
+      }
+    }
+    this.invalidateCache();
+    return {
+      restoredProfiles,
+      totalProfiles: Object.keys(this.load().profiles || {}).length
+    };
+  }
+
+  public deleteLocalSnapshot(filename: string): boolean {
+    const safeName = path.basename(filename);
+    const full = path.join(this.getBackupDir(), safeName);
+    if (fs.existsSync(full)) {
+      fs.unlinkSync(full);
+      return true;
+    }
+    return false;
+  }
+
+  public exportEncryptedBackup(passphrase?: string): string {
+    const data = this.load();
+    const settings = this.sqlite.getAllSettings();
+    const plainPayload = JSON.stringify({
+      app: 'switch-google',
+      version: '1.3.3',
+      exportedAt: new Date().toISOString(),
+      storage: data,
+      settings
+    });
+    if (passphrase && passphrase.trim().length > 0) {
+      const salt = crypto.randomBytes(16);
+      const key = crypto.scryptSync(passphrase.trim(), salt, 32);
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+      let enc = cipher.update(plainPayload, 'utf8', 'hex');
+      enc += cipher.final('hex');
+      const tag = cipher.getAuthTag().toString('hex');
+      return JSON.stringify({
+        app: 'switch-google-encrypted-backup',
+        version: '1.3.3',
+        cipher: 'aes-256-gcm',
+        kdf: 'scrypt',
+        exportedAt: new Date().toISOString(),
+        salt: salt.toString('hex'),
+        iv: iv.toString('hex'),
+        tag,
+        ciphertext: enc
+      }, null, 2);
+    }
+    return JSON.stringify({
+      app: 'switch-google-encrypted-backup',
+      version: '1.3.3',
+      cipher: 'aes-256-gcm-masterkey',
+      exportedAt: new Date().toISOString(),
+      ciphertext: this.encrypt(plainPayload)
+    }, null, 2);
+  }
+
+  public importEncryptedBackup(rawContent: string, passphrase?: string): { restoredProfiles: number; totalProfiles: number } {
+    const parsed = JSON.parse(rawContent);
+    let decryptedJson = '';
+    if (parsed.kdf === 'scrypt') {
+      if (!passphrase || !passphrase.trim()) {
+        throw new Error('Bản sao lưu này được bảo vệ bằng mật khẩu. Vui lòng nhập mật khẩu giải mã.');
+      }
+      const salt = Buffer.from(parsed.salt, 'hex');
+      const iv = Buffer.from(parsed.iv, 'hex');
+      const tag = Buffer.from(parsed.tag, 'hex');
+      const key = crypto.scryptSync(passphrase.trim(), salt, 32);
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(tag);
+      decryptedJson = decipher.update(parsed.ciphertext, 'hex', 'utf8');
+      decryptedJson += decipher.final('utf8');
+    } else if (parsed.cipher === 'aes-256-gcm-masterkey' && parsed.ciphertext) {
+      decryptedJson = this.decrypt(parsed.ciphertext);
+    } else {
+      throw new Error('Định dạng file sao lưu mã hóa không hợp lệ.');
+    }
+
+    const payload = JSON.parse(decryptedJson);
+    const storageObj = payload.storage || payload.data || payload;
+    const restoredProfiles = this.importBackup(JSON.stringify({ data: storageObj }));
+    if (payload.settings && typeof payload.settings === 'object') {
+      for (const [k, v] of Object.entries(payload.settings)) {
+        if (typeof v === 'string') {
+          this.sqlite.setSetting(k, v);
+        }
+      }
+    }
+    this.invalidateCache();
+    return {
+      restoredProfiles,
+      totalProfiles: Object.keys(this.load().profiles || {}).length
+    };
+  }
+
   public exportBackup(): string {
     const data = this.load();
     const backup = {

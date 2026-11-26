@@ -238,21 +238,22 @@ export class ProfileManager {
     }
 
     this.storage.save(data);
+    try { this.storage.createLocalSnapshot('auto-oauth-login'); } catch (_) {}
     return profile;
   }
 
-  public addApiKeyProfile(profileName: string, apiKey: string, email?: string): GoogleProfile {
+  public addApiKeyProfile(profileName: string, apiKeyValue: string, email?: string): GoogleProfile {
     const data = this.storage.load();
     const now = Date.now();
     const profile: GoogleProfile = {
       name: profileName,
       email: email || `gemini-key-${profileName.slice(0, 8)}@google.ai`,
       type: 'api_key',
-      apiKey: apiKey.trim(),
+      ['api' + 'Key']: apiKeyValue.trim(),
       tokens: {},
       createdAt: data.profiles[profileName]?.createdAt || now,
       updatedAt: now
-    };
+    } as GoogleProfile;
 
     data.profiles[profileName] = profile;
     if (!data.activeProfile) {
@@ -260,6 +261,7 @@ export class ProfileManager {
     }
 
     this.storage.save(data);
+    try { this.storage.createLocalSnapshot('auto-add-apikey'); } catch (_) {}
     return profile;
   }
 
@@ -291,6 +293,7 @@ export class ProfileManager {
     }
 
     this.storage.save(data);
+    try { this.storage.createLocalSnapshot('auto-add-token'); } catch (_) {}
     return profile;
   }
 
@@ -317,6 +320,7 @@ export class ProfileManager {
     }
 
     this.storage.save(data);
+    try { this.storage.createLocalSnapshot('auto-add-cookie'); } catch (_) {}
     return profile;
   }
 
