@@ -169,7 +169,10 @@ class FallbackSqliteDb {
                     return { changes: count };
                 }
                 // Usage Logs
-                if (s.startsWith('INSERT INTO usage_logs')) {
+                if (s.startsWith('INSERT INTO usage_logs') || s.startsWith('INSERT OR IGNORE INTO usage_logs')) {
+                    if (s.startsWith('INSERT OR IGNORE') && this.data.usage_logs.some((l) => l.id === args[0])) {
+                        return { changes: 0 };
+                    }
                     this.data.usage_logs.unshift({
                         id: args[0],
                         timestamp: args[1],
@@ -929,7 +932,7 @@ class SqliteStorage {
             ...r
         };
         this.db.prepare(`
-      INSERT INTO usage_logs 
+      INSERT OR IGNORE INTO usage_logs 
       (id, timestamp, profile, email, model, virtual_key, prompt_tokens, completion_tokens, total_tokens, latency_ms, status_code, stream)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(entry.id, entry.timestamp, entry.profile || '', entry.email || '', entry.model || '', entry.virtualKey || '', entry.promptTokens || 0, entry.completionTokens || 0, entry.totalTokens || 0, entry.latencyMs || 0, entry.statusCode || 200, entry.stream ? 1 : 0);

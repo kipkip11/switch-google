@@ -587,10 +587,13 @@ function startApiServer(port = Number(process.env.PORT) || 1909) {
                     }
                 }
             }
-            // Restore logs if any
+            // Restore logs if any (bỏ qua các bản ghi log đã tồn tại id trong DB)
             if (Array.isArray(backup.logs) && backup.logs.length > 0) {
                 for (const log of backup.logs) {
-                    tracker_1.usageTracker.record(log);
+                    try {
+                        tracker_1.usageTracker.record(log);
+                    }
+                    catch (_) { }
                 }
             }
             res.json({

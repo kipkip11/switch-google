@@ -548,10 +548,12 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
         }
       }
 
-      // Restore logs if any
+      // Restore logs if any (bỏ qua các bản ghi log đã tồn tại id trong DB)
       if (Array.isArray(backup.logs) && backup.logs.length > 0) {
         for (const log of backup.logs) {
-          usageTracker.record(log);
+          try {
+            usageTracker.record(log);
+          } catch (_) {}
         }
       }
 
