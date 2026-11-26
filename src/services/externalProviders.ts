@@ -25,24 +25,114 @@ export const DEFAULT_PROVIDERS: ExternalProvider[] = [
     isFree: true
   },
   {
+    id: 'lm_studio_local',
+    name: 'LM Studio / Local Server (Offline)',
+    baseUrl: 'http://localhost:1234/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 2,
+    models: ['local-model', 'qwen2.5-coder-7b', 'gemma-4-12b'],
+    isFree: true
+  },
+  {
+    id: 'ollama_local',
+    name: 'Ollama Local (Tự lưu trữ)',
+    baseUrl: 'http://localhost:11434/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 3,
+    models: ['llama3.3:latest', 'qwen2.5-coder:32b', 'deepseek-r1:latest'],
+    isFree: true
+  },
+  {
+    id: 'cerebras',
+    name: 'Cerebras Cloud (Siêu Tốc 1800+ tok/s)',
+    baseUrl: 'https://api.cerebras.ai/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 4,
+    models: ['llama-3.3-70b', 'llama3.1-8b', 'qwen-2.5-32b'],
+    isFree: false
+  },
+  {
+    id: 'groq',
+    name: 'Groq Cloud (Ultra-Fast LPU)',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 5,
+    models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'qwen-2.5-coder-32b'],
+    isFree: false
+  },
+  {
+    id: 'siliconflow',
+    name: 'SiliconFlow (DeepSeek & Qwen Ecosystem)',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 6,
+    models: ['deepseek-ai/DeepSeek-V3', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-Coder-32B-Instruct'],
+    isFree: false
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek Official API',
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 7,
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+    isFree: false
+  },
+  {
+    id: 'google_ai_studio',
+    name: 'Google AI Studio (Gemini OpenAI Direct)',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    apiKey: '',
+    enabled: false,
+    priority: 8,
+    models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+    isFree: true
+  },
+  {
     id: 'kiro_ai',
     name: 'Kiro AI (Free Quota Tier)',
     baseUrl: 'https://api.kiro.ai/v1',
     apiKey: '',
     enabled: false,
-    priority: 2,
+    priority: 9,
     models: ['claude-3-7-sonnet', 'glm-5', 'minimax-m2.5'],
     isFree: true
   },
   {
-    id: 'deepseek',
-    name: 'DeepSeek Official',
-    baseUrl: 'https://api.deepseek.com/v1',
+    id: 'together_ai',
+    name: 'Together AI (Open-Source Cloud)',
+    baseUrl: 'https://api.together.xyz/v1',
     apiKey: '',
     enabled: false,
-    priority: 3,
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    priority: 10,
+    models: ['meta-llama/Llama-3.3-70B-Instruct-Turbo', 'deepseek-ai/DeepSeek-R1'],
     isFree: false
+  },
+  {
+    id: 'mistral_ai',
+    name: 'Mistral AI Official (Codestral)',
+    baseUrl: 'https://api.mistral.ai/v1',
+    apiKey: '',
+    enabled: false,
+    priority: 11,
+    models: ['codestral-latest', 'mistral-large-latest', 'mistral-small-latest'],
+    isFree: false
+  },
+  {
+    id: 'github_models',
+    name: 'GitHub Models / Azure AI (Free GitHub Token)',
+    baseUrl: 'https://models.inference.ai.azure.com',
+    apiKey: '',
+    enabled: false,
+    priority: 12,
+    models: ['gpt-4o', 'gpt-4o-mini', 'Meta-Llama-3.3-70B-Instruct'],
+    isFree: true
   },
   {
     id: 'glm_zhipu',
@@ -50,28 +140,18 @@ export const DEFAULT_PROVIDERS: ExternalProvider[] = [
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiKey: '',
     enabled: false,
-    priority: 4,
+    priority: 13,
     models: ['glm-4-plus', 'glm-4-flash', 'glm-4-long'],
     isFree: false
   },
   {
-    id: 'groq',
-    name: 'Groq Cloud (Ultra-Fast)',
-    baseUrl: 'https://api.groq.com/openai/v1',
-    apiKey: '',
-    enabled: false,
-    priority: 5,
-    models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
-    isFree: false
-  },
-  {
     id: 'openrouter',
-    name: 'OpenRouter.ai',
+    name: 'OpenRouter.ai (Toàn bộ 200+ models)',
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: '',
     enabled: false,
-    priority: 6,
-    models: ['anthropic/claude-3.7-sonnet', 'deepseek/deepseek-r1'],
+    priority: 14,
+    models: ['anthropic/claude-3.7-sonnet', 'deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct'],
     isFree: false
   }
 ];
@@ -86,14 +166,18 @@ export class ExternalProviderManager {
         return DEFAULT_PROVIDERS;
       }
       const parsed: ExternalProvider[] = JSON.parse(raw);
-      // Merge with default if missing
-      const existingIds = new Set(parsed.map((p) => p.id));
+      // Merge with default if missing or if default was expanded
+      const existingMap = new Map<string, ExternalProvider>();
+      for (const p of parsed) {
+        existingMap.set(p.id, p);
+      }
       for (const def of DEFAULT_PROVIDERS) {
-        if (!existingIds.has(def.id)) {
-          parsed.push(def);
+        if (!existingMap.has(def.id)) {
+          existingMap.set(def.id, def);
         }
       }
-      return parsed.sort((a, b) => a.priority - b.priority);
+      const merged = Array.from(existingMap.values()).sort((a, b) => a.priority - b.priority);
+      return merged;
     } catch {
       return DEFAULT_PROVIDERS;
     }
