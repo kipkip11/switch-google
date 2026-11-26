@@ -12,6 +12,7 @@ export class SmartRouter {
   public static isSmartModel(modelName: string): boolean {
     const m = modelName.toLowerCase();
     return (
+      m.includes('argon') ||
       m.includes('pro') ||
       m.includes('sonnet') ||
       m.includes('opus') ||

@@ -287,6 +287,12 @@
                 <button class="btn btn-sm" onclick="toggleRackViewMode()">
                   <span id="rack-view-mode-label">1 Hàng</span>
                 </button>
+                <button class="btn btn-sm" onclick="downloadBackup()" title="Sao lưu nhanh toàn bộ tài khoản đã nhập ra file JSON">
+                  💾 Sao lưu TK
+                </button>
+                <button class="btn btn-sm" onclick="document.getElementById('file-import-json').click()" title="Khôi phục tài khoản từ file JSON đã sao lưu">
+                  📥 Khôi phục TK
+                </button>
                 <button class="btn btn-primary btn-sm" onclick="saveRotationConfig()">Lưu</button>
               </div>
             </div>
@@ -616,15 +622,18 @@
 
                 <div class="chips-group-row">
                   <span class="chips-group-title">Google Gemini</span>
+                  <span class="model-toggle-chip active" onclick="toggleModelChip(this)"><span>gemini-4-argon-high</span><input type="checkbox" value="gemini-4-argon-high" class="combo-box" checked hidden /></span>
+                  <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>gemini-4-argon</span><input type="checkbox" value="gemini-4-argon" class="combo-box" hidden /></span>
+                  <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>gemini-3.8-flash-high</span><input type="checkbox" value="gemini-3.8-flash-high" class="combo-box" hidden /></span>
                   <span class="model-toggle-chip active" onclick="toggleModelChip(this)"><span>gemini-3.8-flash</span><input type="checkbox" value="gemini-3.8-flash" class="combo-box" checked hidden /></span>
                   <span class="model-toggle-chip active" onclick="toggleModelChip(this)"><span>gemini-3.8-pro</span><input type="checkbox" value="gemini-3.8-pro" class="combo-box" checked hidden /></span>
                   <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>gemini-2.5-pro</span><input type="checkbox" value="gemini-2.5-pro" class="combo-box" hidden /></span>
                   <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>gemini-2.5-flash</span><input type="checkbox" value="gemini-2.5-flash" class="combo-box" hidden /></span>
-                  <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>gemini-1.5-pro</span><input type="checkbox" value="gemini-1.5-pro" class="combo-box" hidden /></span>
                 </div>
 
                 <div class="chips-group-row">
                   <span class="chips-group-title">Anthropic Claude</span>
+                  <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>claude-sonnet-5-5-high</span><input type="checkbox" value="claude-sonnet-5-5-high" class="combo-box" hidden /></span>
                   <span class="model-toggle-chip active" onclick="toggleModelChip(this)"><span>claude-3-7-sonnet</span><input type="checkbox" value="claude-3-7-sonnet" class="combo-box" checked hidden /></span>
                   <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>claude-3-7-sonnet-thinking</span><input type="checkbox" value="claude-3-7-sonnet-thinking" class="combo-box" hidden /></span>
                   <span class="model-toggle-chip" onclick="toggleModelChip(this)"><span>claude-3-5-sonnet</span><input type="checkbox" value="claude-3-5-sonnet" class="combo-box" hidden /></span>

@@ -5,8 +5,11 @@
 (function () {
   const AVAILABLE_MODELS = [
     {
-      group: 'Google Gemini',
+      group: 'Google Gemini & Argon (CloudCode)',
       models: [
+        { id: 'gemini-4-argon-high', label: 'gemini-4-argon-high (Argon High - Tư duy sâu)' },
+        { id: 'gemini-4-argon', label: 'gemini-4-argon (Argon Pro)' },
+        { id: 'gemini-3.8-flash-high', label: 'gemini-3.8-flash-high (Flash High)' },
         { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash (Siêu Tốc)' },
         { id: 'gemini-3.8-pro', label: 'gemini-3.8-pro (Tư duy sâu)' },
         { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
@@ -18,6 +21,7 @@
     {
       group: 'Anthropic Claude',
       models: [
+        { id: 'claude-sonnet-5-5-high', label: 'claude-sonnet-5-5-high (Sonnet 5.5 High)' },
         { id: 'claude-3-7-sonnet', label: 'claude-3-7-sonnet (Claude 3.7 Pro)' },
         { id: 'claude-3-7-sonnet-thinking', label: 'claude-3-7-sonnet-thinking' },
         { id: 'claude-3-5-sonnet', label: 'claude-3-5-sonnet' }

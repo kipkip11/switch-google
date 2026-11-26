@@ -13,7 +13,8 @@ class SmartRouter {
     ];
     static isSmartModel(modelName) {
         const m = modelName.toLowerCase();
-        return (m.includes('pro') ||
+        return (m.includes('argon') ||
+            m.includes('pro') ||
             m.includes('sonnet') ||
             m.includes('opus') ||
             m.includes('r1') ||

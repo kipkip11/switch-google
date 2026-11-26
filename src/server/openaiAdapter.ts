@@ -369,6 +369,52 @@ function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
 // Bộ nhớ tạm lưu thời điểm model bị cạn quota toàn cục (modelName -> hết hạn lúc timestamp)
 const exhaustedModelsCache = new Map<string, number>();
 
+/**
+ * Log chẩn đoán cấu trúc upstream theo SPEC-006 Pha A (A2).
+ * Mặc định TẮT; chỉ bật khi process.env.SG_DEBUG_UPSTREAM === '1'.
+ * Tuyệt đối KHÔNG ghi nội dung text, KHÔNG ghi functionCall.name hay functionCall.args.
+ */
+function logUpstreamStructure(
+  branch: 'stream' | 'non-stream',
+  targetModel: string,
+  actualModel: string,
+  generationConfig: any,
+  data: any
+): void {
+  if (process.env.SG_DEBUG_UPSTREAM !== '1' || !data) return;
+  const hasResponseWrapper = Boolean(data && typeof data === 'object' && data.response);
+  const candidate = data.candidates?.[0] || data.response?.candidates?.[0] || {};
+  const parts: any[] = Array.isArray(candidate.content?.parts) ? candidate.content.parts : [];
+  const partsSummary = parts.map((p: any) => ({
+    hasThought: p?.thought === true,
+    textLength: typeof p?.text === 'string' ? p.text.length : 0,
+    hasFunctionCall: Boolean(p?.functionCall)
+  }));
+  const rawUsage = data.usageMetadata || data.response?.usageMetadata || null;
+  const usageSummary = rawUsage
+    ? {
+        location: data.usageMetadata ? 'top' : 'response',
+        promptTokenCount: rawUsage.promptTokenCount ?? null,
+        candidatesTokenCount: rawUsage.candidatesTokenCount ?? null,
+        thoughtsTokenCount: rawUsage.thoughtsTokenCount ?? null,
+        totalTokenCount: rawUsage.totalTokenCount ?? null
+      }
+    : null;
+  console.log(
+    `[SG_DEBUG_UPSTREAM] ${JSON.stringify({
+      branch,
+      targetModel,
+      actualModel,
+      generationConfig: generationConfig || {},
+      hasResponseWrapper,
+      finishReason: candidate.finishReason ?? null,
+      partsCount: partsSummary.length,
+      parts: partsSummary,
+      usageMetadata: usageSummary
+    })}`
+  );
+}
+
 export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRotator, port = 1909): Router {
   const router = Router();
 
@@ -390,11 +436,15 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
   // GET /v1/models (Công khai, không chặn 401 khi Gateway/client thăm dò)
   router.get('/models', (req: Request, res: Response) => {
     const baseModels = [
+      'gemini-4-argon-high',
+      'gemini-4-argon',
+      'gemini-3.8-flash-high',
+      'gemini-3.8-pro',
+      'gemini-3.8-flash',
+      'claude-sonnet-5-5-high',
       'claude-3-7-sonnet',
       'claude-3-7-sonnet-thinking',
       'claude-3-5-sonnet',
-      'gemini-3.8-pro',
-      'gemini-3.8-flash',
       'gpt-4o',
       'deepseek-r1',
       'deepseek-v3',
@@ -650,6 +700,7 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             };
 
             const processDataJson = (data: any) => {
+              logUpstreamStructure('stream', targetModel, actualModel, geminiBody.generationConfig, data);
               const usageMeta = data.usageMetadata || data.response?.usageMetadata;
               if (usageMeta) {
                 if (usageMeta.promptTokenCount !== undefined) streamPromptTokens = usageMeta.promptTokenCount;
@@ -801,6 +852,8 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             const res = await callUpstreamGoogle(creds, actualModel, geminiBody, false);
             return await res.json();
           });
+
+          logUpstreamStructure('non-stream', targetModel, actualModel, geminiBody.generationConfig, data);
 
           const candidate = (data.candidates || data.response?.candidates || [])[0] || {};
           const parts = candidate.content?.parts || [];
