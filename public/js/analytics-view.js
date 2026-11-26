@@ -297,12 +297,49 @@
     btn.textContent = isHidden ? 'Thu gọn' : 'Xem chi tiết';
   };
 
+  let allCachedQuotas = [];
+
+  window.filterQuotaCards = function (keyword) {
+    if (!allCachedQuotas || allCachedQuotas.length === 0) return;
+    const term = (keyword || '').toLowerCase().trim();
+    if (!term) {
+      renderQuotasCards(allCachedQuotas);
+      return;
+    }
+    const filtered = allCachedQuotas.filter((q) => {
+      return (q.name || '').toLowerCase().includes(term) || (q.id || '').toLowerCase().includes(term) || (q.badge || '').toLowerCase().includes(term);
+    });
+    renderQuotasCards(filtered);
+  };
+
   function renderQuotasCards(quotas) {
     const container = document.getElementById('quotas-cards-container');
     if (!container) return;
 
+    allCachedQuotas = quotas || [];
+
+    // Update KPI Summary Strip
+    try {
+      const totalPoolDaily = (quotas || []).reduce((acc, q) => acc + Number(q.dailyLimit || 0), 0);
+      const totalUsedToday = (quotas || []).reduce((acc, q) => acc + Number(q.usedToday || 0), 0);
+      const maxRpm = Math.max(0, ...(quotas || []).map((q) => Number(q.rpmLimit || 0)));
+      const costVnd = Math.round((totalUsedToday / 1_000_000) * 9000);
+
+      const elTotalPool = document.getElementById('kpi-quota-total-pool');
+      const elMaxRpm = document.getElementById('kpi-quota-max-rpm');
+      const elUsedTokens = document.getElementById('kpi-quota-used-tokens');
+      const elCostVnd = document.getElementById('kpi-quota-cost-vnd');
+      const elModelsCount = document.getElementById('kpi-quota-models-count');
+
+      if (elTotalPool) elTotalPool.textContent = (totalPoolDaily / 1_000_000).toLocaleString() + ' M tok/ngày';
+      if (elMaxRpm) elMaxRpm.textContent = maxRpm.toLocaleString() + ' RPM';
+      if (elUsedTokens) elUsedTokens.textContent = window.SG.formatTokens(totalUsedToday) + ' tok';
+      if (elCostVnd) elCostVnd.textContent = '≈ ' + costVnd.toLocaleString('vi-VN') + ' VNĐ';
+      if (elModelsCount) elModelsCount.textContent = (quotas || []).length + ' Models';
+    } catch (_) {}
+
     if (!quotas || quotas.length === 0) {
-      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Chưa có dữ liệu hạn ngạch model.</div>`;
+      container.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Không tìm thấy model nào phù hợp.</div>`;
       return;
     }
 
@@ -317,6 +354,7 @@
         const pct = Math.max(0, Math.min(100, 100 - Math.round((used / dailyLimit) * 100)));
         const accentColor = q.color || 'var(--brand)';
         const accounts = q.accounts || [];
+        const modelCostVnd = Math.round((used / 1_000_000) * 9000);
 
         const accountsHtml = accounts.map((acc) => {
           let badgeClass = 'badge-success';
@@ -367,33 +405,41 @@
                 <h3 class="quota-name">${esc(q.name || q.id)}</h3>
                 <div class="quota-desc">Model ID: <span class="mono-num">${esc(q.id)}</span></div>
               </div>
-              <span class="badge badge-neutral">${esc(q.badge || 'ACTIVE')}</span>
+              <span class="badge badge-neutral" style="border-left: 3px solid ${esc(accentColor)};">${esc(q.badge || 'ACTIVE')}</span>
             </div>
 
             <div>
               <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700;">
-                <span style="color: var(--text-secondary);">Hạn mức cả Pool còn lại trong ngày</span>
+                <span style="color: var(--text-secondary);">Hạn mức Pool còn lại trong ngày</span>
                 <span class="mono-num" style="color: ${esc(accentColor)};">${pct}% (${fmt(remaining)} tok)</span>
               </div>
-              <div class="progress-track">
+              <div class="progress-track" style="margin-top: 6px;">
                 <div class="progress-fill" style="width: ${pct}%; background: ${esc(accentColor)};"></div>
               </div>
             </div>
 
-            <div class="quota-stats-row">
+            <div class="quota-stats-row" style="grid-template-columns: repeat(4, 1fr); gap: 8px;">
               <div class="quota-stat-box">
-                <div class="quota-stat-lbl">Tốc độ tối đa (RPM)</div>
-                <div class="quota-stat-val">${Number(q.rpmLimit || 0).toLocaleString()} req/m</div>
+                <div class="quota-stat-lbl">Tốc độ tối đa</div>
+                <div class="quota-stat-val">${Number(q.rpmLimit || 0).toLocaleString()} RPM</div>
               </div>
               <div class="quota-stat-box">
-                <div class="quota-stat-lbl">Cổng sẵn sàng</div>
-                <div class="quota-stat-val" style="color: var(--status-up);">${Number(q.availableAccounts || 0)} cổng UP</div>
+                <div class="quota-stat-lbl">TPM Giới hạn</div>
+                <div class="quota-stat-val">${fmt(q.tpmLimit || 0)}/m</div>
+              </div>
+              <div class="quota-stat-box">
+                <div class="quota-stat-lbl">Context Window</div>
+                <div class="quota-stat-val" style="font-size: 0.75rem;">${esc(q.contextWindow || '1M tokens')}</div>
+              </div>
+              <div class="quota-stat-box">
+                <div class="quota-stat-lbl">Đã Dùng (VNĐ)</div>
+                <div class="quota-stat-val" style="color: var(--brand); font-size: 0.78rem;">≈ ${modelCostVnd.toLocaleString('vi-VN')} đ</div>
               </div>
             </div>
 
             <div class="quota-accounts-section">
               <div class="quota-accounts-header">
-                <span class="quota-accounts-title">Chi Tiết Từng Tài Khoản (${accounts.length} Cổng)</span>
+                <span class="quota-accounts-title">Chi Tiết Từng Tài Khoản (${accounts.length} Cổng • ${Number(q.availableAccounts || 0)} UP)</span>
                 <button class="btn btn-xs btn-ghost" onclick="toggleQuotaAccounts(this)">Thu gọn</button>
               </div>
               <div class="quota-accounts-list">

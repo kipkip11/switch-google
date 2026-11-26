@@ -315,43 +315,116 @@ export function startApiServer(port = Number(process.env.PORT) || 1909): void {
 
       const quotaData = [
         {
-          id: 'claude-3-7-sonnet',
-          name: 'Claude 3.7 Sonnet (Thinking)',
-          badge: 'ĐỈNH CAO CODE',
-          color: '#7C3AED',
-          dailyLimit: poolCapacity * 10000000, // 10M per account/day
-          usedToday: recent24hModelMap['claude-3-7-sonnet'] || recent24hModelMap['claude-sonnet-5-5-high'] || 0,
+          id: 'gemini-4-argon-high',
+          name: 'Gemini 4 Argon High (Tư Duy Sâu & Phân Tích)',
+          badge: 'ARGON TOP-TIER',
+          color: '#EA580C',
+          contextWindow: '2,097,152 tokens (2M)',
+          dailyLimit: poolCapacity * 15000000,
+          usedToday: recent24hModelMap['gemini-4-argon-high'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 600000,
+          availableAccounts: poolCapacity,
+          status: 'healthy',
+          accounts: getAccountsForModel(['gemini-4-argon-high'], 15000000)
+        },
+        {
+          id: 'gemini-4-argon',
+          name: 'Gemini 4 Argon Standard',
+          badge: 'TƯ DUY CAO CẤP',
+          color: '#D97706',
+          contextWindow: '2,097,152 tokens (2M)',
+          dailyLimit: poolCapacity * 20000000,
+          usedToday: recent24hModelMap['gemini-4-argon'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 600000,
+          availableAccounts: poolCapacity,
+          status: 'healthy',
+          accounts: getAccountsForModel(['gemini-4-argon'], 20000000)
+        },
+        {
+          id: 'claude-sonnet-5-5-high',
+          name: 'Claude Sonnet 5.5 High',
+          badge: 'CHUYÊN GIA KIẾN TRÚC',
+          color: '#9333EA',
+          contextWindow: '1,000,000 tokens (1M)',
+          dailyLimit: poolCapacity * 10000000,
+          usedToday: recent24hModelMap['claude-sonnet-5-5-high'] || 0,
           rpmLimit: poolCapacity * 60,
           tpmLimit: poolCapacity * 400000,
           availableAccounts: poolCapacity,
           status: 'healthy',
-          accounts: getAccountsForModel(['claude-3-7-sonnet', 'claude-sonnet-5-5-high'], 10000000)
+          accounts: getAccountsForModel(['claude-sonnet-5-5-high'], 10000000)
         },
         {
-          id: 'gemini-3.8-flash',
-          name: 'Gemini 3.8 Flash',
-          badge: 'SIÊU TỐC ĐỘ',
+          id: 'claude-3-7-sonnet',
+          name: 'Claude 3.7 Sonnet (Thinking & Code)',
+          badge: 'ĐỈNH CAO CODE',
+          color: '#7C3AED',
+          contextWindow: '200,000 tokens',
+          dailyLimit: poolCapacity * 10000000,
+          usedToday: recent24hModelMap['claude-3-7-sonnet'] || recent24hModelMap['claude-3-7-sonnet-thinking'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 400000,
+          availableAccounts: poolCapacity,
+          status: 'healthy',
+          accounts: getAccountsForModel(['claude-3-7-sonnet', 'claude-3-7-sonnet-thinking'], 10000000)
+        },
+        {
+          id: 'gemini-3.8-flash-high',
+          name: 'Gemini 3.8 Flash High',
+          badge: 'FLASH TỐC ĐỘ CAO',
           color: '#0284C7',
-          dailyLimit: poolCapacity * 50000000, // 50M per account/day
-          usedToday: recent24hModelMap['gemini-3.8-flash'] || recent24hModelMap['gemini-3.8-flash-high'] || 0,
+          contextWindow: '1,048,576 tokens (1M)',
+          dailyLimit: poolCapacity * 40000000,
+          usedToday: recent24hModelMap['gemini-3.8-flash-high'] || 0,
           rpmLimit: poolCapacity * 120,
           tpmLimit: poolCapacity * 1000000,
           availableAccounts: poolCapacity,
           status: 'healthy',
-          accounts: getAccountsForModel(['gemini-3.8-flash', 'gemini-3.8-flash-high'], 50000000)
+          accounts: getAccountsForModel(['gemini-3.8-flash-high'], 40000000)
         },
         {
-          id: 'gemini-4-argon',
-          name: 'Gemini 4 Argon / 2.5 Pro',
-          badge: 'TƯ DUY SÂU & 2M CONTEXT',
-          color: '#D97706',
-          dailyLimit: poolCapacity * 20000000, // 20M per account/day
-          usedToday: recent24hModelMap['gemini-4-argon'] || recent24hModelMap['gemini-2.5-pro'] || recent24hModelMap['gemini-4-argon-high'] || 0,
+          id: 'gemini-3.8-flash',
+          name: 'Gemini 3.8 Flash Standard',
+          badge: 'SIÊU TỐC ĐỘ 120 RPM',
+          color: '#0EA5E9',
+          contextWindow: '1,048,576 tokens (1M)',
+          dailyLimit: poolCapacity * 50000000,
+          usedToday: recent24hModelMap['gemini-3.8-flash'] || 0,
+          rpmLimit: poolCapacity * 120,
+          tpmLimit: poolCapacity * 1000000,
+          availableAccounts: poolCapacity,
+          status: 'healthy',
+          accounts: getAccountsForModel(['gemini-3.8-flash'], 50000000)
+        },
+        {
+          id: 'claude-3-5-sonnet',
+          name: 'Claude 3.5 Sonnet Legacy',
+          badge: 'CHUẨN ỔN ĐỊNH',
+          color: '#6366F1',
+          contextWindow: '200,000 tokens',
+          dailyLimit: poolCapacity * 15000000,
+          usedToday: recent24hModelMap['claude-3-5-sonnet'] || 0,
+          rpmLimit: poolCapacity * 60,
+          tpmLimit: poolCapacity * 400000,
+          availableAccounts: poolCapacity,
+          status: 'healthy',
+          accounts: getAccountsForModel(['claude-3-5-sonnet'], 15000000)
+        },
+        {
+          id: 'gemini-2.5-pro',
+          name: 'Gemini 2.5 Pro Official',
+          badge: '2M CONTEXT MẠNH MẼ',
+          color: '#10B981',
+          contextWindow: '2,097,152 tokens (2M)',
+          dailyLimit: poolCapacity * 25000000,
+          usedToday: recent24hModelMap['gemini-2.5-pro'] || 0,
           rpmLimit: poolCapacity * 60,
           tpmLimit: poolCapacity * 500000,
           availableAccounts: poolCapacity,
           status: 'healthy',
-          accounts: getAccountsForModel(['gemini-4-argon', 'gemini-2.5-pro', 'gemini-4-argon-high'], 20000000)
+          accounts: getAccountsForModel(['gemini-2.5-pro'], 25000000)
         }
       ];
 

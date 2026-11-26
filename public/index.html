@@ -585,13 +585,40 @@
         <!-- PANE 3: MODEL QUOTAS                                         -->
         <!-- ============================================================ -->
         <section class="view-pane" id="pane-quotas" role="tabpanel">
-          <div class="card">
+          <div class="card" style="margin-bottom: 16px;">
             <div class="card-header" style="margin-bottom: 0;">
               <div class="card-title-group">
                 <h2 class="card-title">Hạn Ngạch &amp; Công Suất Theo Model</h2>
-                <p class="card-desc">Ước tính năng lực xử lý hàng ngày và giới hạn RPM tổng hợp từ các cổng đang hoạt động.</p>
+                <p class="card-desc">Ước tính năng lực xử lý hàng ngày, giới hạn RPM/TPM và theo dõi trực tiếp mức tiêu hao token từng cổng.</p>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="loadDetailedAnalytics()">Làm mới Quota</button>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="quota-search-input" class="input-control" placeholder="Tìm model..." style="width: 160px; font-size: 0.82rem; padding: 4px 10px;" oninput="filterQuotaCards(this.value)" />
+                <button class="btn btn-primary btn-sm" onclick="loadDetailedAnalytics()">Làm mới Quota</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Summary Strip for Quotas -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px;" id="quotas-kpi-summary">
+            <div class="card" style="padding: 14px 18px;">
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Tổng Công Suất Pool</div>
+              <div class="mono-num" id="kpi-quota-total-pool" style="font-size: 1.4rem; font-weight: 800; color: var(--brand); margin-top: 4px;">-- M tok/ngày</div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;" id="kpi-quota-sub-pool">Cộng dồn tất cả model</div>
+            </div>
+            <div class="card" style="padding: 14px 18px;">
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Băng Thông Lớn Nhất</div>
+              <div class="mono-num" id="kpi-quota-max-rpm" style="font-size: 1.4rem; font-weight: 800; color: #0284C7; margin-top: 4px;">-- RPM</div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;">Flash Model Tier</div>
+            </div>
+            <div class="card" style="padding: 14px 18px;">
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Đã Dùng Trong Ngày</div>
+              <div class="mono-num" id="kpi-quota-used-tokens" style="font-size: 1.4rem; font-weight: 800; color: var(--text-main); margin-top: 4px;">-- tok</div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;" id="kpi-quota-cost-vnd">≈ -- VNĐ</div>
+            </div>
+            <div class="card" style="padding: 14px 18px;">
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Số Model Sẵn Sàng</div>
+              <div class="mono-num" id="kpi-quota-models-count" style="font-size: 1.4rem; font-weight: 800; color: #10B981; margin-top: 4px;">8 Models</div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;">Gemini &amp; Claude CloudCode</div>
             </div>
           </div>
 
