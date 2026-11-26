@@ -297,9 +297,7 @@ class AccountRotator {
     async getAvailableAccounts() {
         const profiles = this.manager.listProfiles();
         const now = Date.now();
-        // Lọc ra các tài khoản không bị disable thủ công, không bị ban, không bị cooldown
-        // VÀ LOẠI BỎ các tài khoản web_session đã hết hạn cookie (tránh failover lặp đi lặp lại gây tăng độ trễ)
-        const available = profiles
+        const filterValid = (list) => list
             .filter((p) => {
             if (this.disabledProfiles.has(p.name))
                 return false;
@@ -313,14 +311,25 @@ class AccountRotator {
             return !(s?.cooldownUntil && s.cooldownUntil > now);
         })
             .map((p) => p.name);
-        // Nếu tất cả tài khoản sạch đều hết, mở lại các tài khoản OAuth/Token còn hạn (tránh kích hoạt cookie hỏng)
-        if (available.length === 0 && profiles.length > 0) {
-            const nonBanned = profiles
-                .filter((p) => !this.disabledProfiles.has(p.name) && !(p.type === 'web_session' && p.isExpired) && !this.stats.get(p.name)?.isBanned)
-                .map((p) => p.name);
-            return nonBanned.length > 0 ? nonBanned : profiles.filter(p => !(p.type === 'web_session' && p.isExpired)).map((p) => p.name);
+        // Ưu tiên số 1: Chỉ xoay vòng trong nhóm tài khoản Direct API (OAuth / Token / API Key) tốc độ cao
+        const directProfiles = profiles.filter((p) => p.type === 'oauth' || p.type === 'token' || p.type === 'api_key');
+        const availableDirect = filterValid(directProfiles);
+        if (availableDirect.length > 0) {
+            return availableDirect;
         }
-        return available;
+        // Dự phòng số 2: Chỉ khi không còn tài khoản Direct API nào khả dụng mới dùng tới Web Session
+        const availableAll = filterValid(profiles);
+        if (availableAll.length > 0) {
+            return availableAll;
+        }
+        // Nếu tất cả đang cooldown tạm thời, mở lại các tài khoản Direct API không bị ban
+        const nonBannedDirect = directProfiles
+            .filter((p) => !this.disabledProfiles.has(p.name) && !this.stats.get(p.name)?.isBanned)
+            .map((p) => p.name);
+        if (nonBannedDirect.length > 0) {
+            return nonBannedDirect;
+        }
+        return profiles.filter((p) => !(p.type === 'web_session' && p.isExpired)).map((p) => p.name);
     }
     async getNextAccount(excludedAccounts = []) {
         const allProfiles = this.manager.listProfiles();
@@ -445,6 +454,16 @@ class AccountRotator {
                 // ngắt ngay để chuyển sang model dự phòng tiếp theo thay vì thử lặp lại trên các tài khoản khác!
                 if (err.status === 400 && (errMsg.includes('invalid_request') || errMsg.includes('INVALID_ARGUMENT'))) {
                     throw err;
+                }
+                // Nếu lỗi HTTP 404 (Requested entity was not found -> Model không tồn tại trên Google CloudCode),
+                // quăng lỗi ra ngay để vòng lặp bên ngoài chuyển sang model tiếp theo ngay lập tức, KHÔNG phạt cooldown tài khoản!
+                if (err.status === 404 || errMsg.includes('Requested entity was not found')) {
+                    throw err;
+                }
+                // Nếu tài khoản web_session bị lỗi HTTP 302 Cookie hết hạn, phạt cooldown dài 30 phút để không làm chậm các request sau
+                if (errMsg.includes('HTTP 302') || errMsg.includes('kiểm tra lại Cookie')) {
+                    this.markCooldown(creds.profile, 1800);
+                    continue;
                 }
                 const isBannedIssue = errMsg.includes('TOS_VIOLATION') ||
                     errMsg.includes('VALIDATION_REQUIRED') ||

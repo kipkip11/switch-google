@@ -39,6 +39,7 @@ const tls = __importStar(require("tls"));
 const dns = __importStar(require("dns"));
 const certManager_1 = require("./certManager");
 const modelFallback_1 = require("../services/modelFallback");
+const smartRouter_1 = require("../services/smartRouter");
 const tracker_1 = require("../usage/tracker");
 class MitmServer {
     profileManager;
@@ -164,13 +165,32 @@ class MitmServer {
             const activeCombo = this.profileManager.getActiveSystemCombo();
             let modelCandidates = [];
             if (activeCombo && activeCombo.models.length > 0) {
-                const chosen = activeCombo.activeModel || activeCombo.models[0];
-                const primaryUpstream = (0, modelFallback_1.resolveUpstreamModel)(chosen);
-                const otherUpstreams = activeCombo.models
-                    .filter((m) => m !== chosen)
-                    .map((m) => (0, modelFallback_1.resolveUpstreamModel)(m));
-                modelCandidates = Array.from(new Set([primaryUpstream, ...otherUpstreams]));
-                console.log(`[MitmFastPipe] ⚡ Áp dụng System Combo [${activeCombo.name}]: Model đã chọn [${chosen}] (${primaryUpstream})`);
+                if (activeCombo.strategy === 'smart-routing') {
+                    const contentsOrMessages = parsedBody?.contents || parsedBody?.messages || [];
+                    const tools = parsedBody?.tools || [];
+                    const analysis = smartRouter_1.SmartRouter.calculateComplexity(contentsOrMessages, tools);
+                    console.log(`[MitmFastPipe] 🧠 SmartRouter phân tích: isComplex=${analysis.isComplex}, score=${analysis.score} (${analysis.reason})`);
+                    const prioritized = smartRouter_1.SmartRouter.prioritizeModels(activeCombo.models, analysis.isComplex);
+                    let orderedModels = prioritized;
+                    if (activeCombo.activeModel && activeCombo.models.includes(activeCombo.activeModel)) {
+                        const isChosenSmart = smartRouter_1.SmartRouter.isSmartModel(activeCombo.activeModel);
+                        const isChosenFast = smartRouter_1.SmartRouter.isFastModel(activeCombo.activeModel);
+                        if ((analysis.isComplex && isChosenSmart) || (!analysis.isComplex && isChosenFast)) {
+                            orderedModels = [activeCombo.activeModel, ...prioritized.filter(m => m !== activeCombo.activeModel)];
+                        }
+                    }
+                    modelCandidates = Array.from(new Set(orderedModels.map(m => (0, modelFallback_1.resolveUpstreamModel)(m))));
+                    console.log(`[MitmFastPipe] ⚡ Áp dụng Smart-Routing [${activeCombo.name}]: Model ưu tiên hàng đầu [${orderedModels[0]}] -> ${modelCandidates[0]}`);
+                }
+                else {
+                    const chosen = activeCombo.activeModel || activeCombo.models[0];
+                    const primaryUpstream = (0, modelFallback_1.resolveUpstreamModel)(chosen);
+                    const otherUpstreams = activeCombo.models
+                        .filter((m) => m !== chosen)
+                        .map((m) => (0, modelFallback_1.resolveUpstreamModel)(m));
+                    modelCandidates = Array.from(new Set([primaryUpstream, ...otherUpstreams]));
+                    console.log(`[MitmFastPipe] ⚡ Áp dụng System Combo [${activeCombo.name}]: Model đã chọn [${chosen}] (${primaryUpstream})`);
+                }
             }
             else {
                 modelCandidates = fallbackMgr.getUpstreamFallbackChain(originalModel);
@@ -291,6 +311,14 @@ class MitmServer {
                                         stream: true
                                     });
                                     this.rotator.recordSuccess(creds.profile, finalTokens);
+                                    if (activeCombo && activeCombo.strategy === 'smart-routing' && activeCombo.activeModel !== displayModel) {
+                                        setImmediate(() => {
+                                            try {
+                                                this.profileManager.setActiveModelInCombo(activeCombo.id, displayModel);
+                                            }
+                                            catch (_) { }
+                                        });
+                                    }
                                     resolve();
                                 });
                             });

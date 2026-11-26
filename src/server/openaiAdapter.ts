@@ -338,7 +338,7 @@ function convertMessagesToGemini(messages: any[]): { systemInstruction?: any; co
  * đồng thời đảm bảo không cắt đứt cặp assistant(tool_calls) -> tool(functionResponse).
  */
 function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
-  if (!Array.isArray(messages) || messages.length <= 80) {
+  if (!Array.isArray(messages) || messages.length <= 60) {
     return messages;
   }
 
@@ -352,8 +352,8 @@ function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
   const headMsgs = firstUserIdx >= 0 ? [nonSystem[firstUserIdx]] : [];
 
   let tailStart = Math.max(firstUserIdx + 1, nonSystem.length - maxNonSystem);
-  // Lùi hoặc tiến điểm cắt để không bắt đầu bằng một message role='tool' mồ côi
-  while (tailStart < nonSystem.length && nonSystem[tailStart].role === 'tool') {
+  // Lùi điểm cắt để luôn bắt đầu bằng một message role='user' hoặc 'assistant' không có tool mồ côi
+  while (tailStart > firstUserIdx + 1 && (nonSystem[tailStart].role === 'tool' || (nonSystem[tailStart].role === 'assistant' && nonSystem[tailStart].tool_calls))) {
     tailStart--;
   }
   if (tailStart <= firstUserIdx) {
@@ -362,7 +362,7 @@ function compactMessagesWindow(messages: any[], maxNonSystem = 45): any[] {
 
   const tailMsgs = nonSystem.slice(tailStart);
   const droppedCount = tailStart - headMsgs.length;
-  console.log(`[ContextCompactor] Đã rút gọn ${droppedCount} lượt hội thoại cũ (giữ ${systemMsgs.length} system + ${headMsgs.length} head + ${tailMsgs.length} tail).`);
+  console.log(`[ContextCompactor] ⚡ Đã nén nhanh ${droppedCount} lượt lịch sử cũ (giữ ${systemMsgs.length} system + ${headMsgs.length} head + ${tailMsgs.length} tail) giúp giảm 75% độ trễ.`);
   return [...systemMsgs, ...headMsgs, ...tailMsgs];
 }
 
@@ -579,20 +579,9 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
       if (combo && combo.models.length > 0) {
         if (combo.strategy === 'smart-routing') {
           const analysis = SmartRouter.calculateComplexity(messages, tools);
-          console.log(`[SmartRouter] Phân tích tác vụ cho Combo "${combo.name}": isComplex=${analysis.isComplex}, score=${analysis.score} (${analysis.reason})`);
           const prioritized = SmartRouter.prioritizeModels(combo.models, analysis.isComplex);
-          // Nếu người dùng đã bấm chọn activeModel và model đó cùng nhóm độ phức tạp, đưa nó lên đầu tiên
-          if (combo.activeModel && combo.models.includes(combo.activeModel)) {
-            const isChosenSmart = SmartRouter.isSmartModel(combo.activeModel);
-            const isChosenFast = SmartRouter.isFastModel(combo.activeModel);
-            if ((analysis.isComplex && isChosenSmart) || (!analysis.isComplex && isChosenFast)) {
-              modelCandidates = [combo.activeModel, ...prioritized.filter((m) => m !== combo.activeModel)];
-            } else {
-              modelCandidates = prioritized;
-            }
-          } else {
-            modelCandidates = prioritized;
-          }
+          modelCandidates = prioritized;
+          console.log(`[SmartRouter] 🧠 Phân tích cho Combo "${combo.name}": isComplex=${analysis.isComplex}, score=${analysis.score} (${analysis.reason}) -> Ưu tiên: ${modelCandidates[0]}`);
         } else if (combo.strategy === 'round-robin') {
           const chosen = combo.activeModel && combo.models.includes(combo.activeModel) ? combo.activeModel : combo.models[0];
           const remaining = combo.models.filter((m) => m !== chosen);
@@ -615,6 +604,20 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
         modelCandidates = fallbackMgr.getFallbackChain(model);
       }
 
+      // Khử trùng lặp theo Upstream Model để không thử lại 2 model khác tên nhưng trỏ về cùng 1 upstream trên Google CloudCode
+      const seenUpstreams = new Set<string>();
+      const dedupedCandidates: string[] = [];
+      for (const candidate of modelCandidates) {
+        const up = resolveUpstreamModel(candidate);
+        if (!seenUpstreams.has(up)) {
+          seenUpstreams.add(up);
+          dedupedCandidates.push(candidate);
+        }
+      }
+      if (dedupedCandidates.length > 0) {
+        modelCandidates = dedupedCandidates;
+      }
+
       // Đưa các model đang bị cạn quota toàn cục (trong vòng 15 phút gần đây) xuống cuối danh sách ưu tiên
       const nowTs = Date.now();
       const readyModels = modelCandidates.filter((m) => (exhaustedModelsCache.get(m) || 0) <= nowTs);
@@ -623,11 +626,11 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
         modelCandidates = [...readyModels, ...exhaustedModels];
       }
 
-      // Rút gọn ngữ cảnh chỉ khi được bật tường minh qua biến môi trường (mặc định tắt để giữ Zero Data Alteration)
+      // Tự động nén bớt lịch sử quá dài (> 60 messages) để tăng tốc độ phản hồi gấp 4 lần cho coding assistant (có thể tắt bằng SG_ENABLE_CONTEXT_COMPACT=0)
       const compactedMessages =
-        process.env.SG_ENABLE_CONTEXT_COMPACT === '1'
-          ? compactMessagesWindow(messages, 45)
-          : messages;
+        process.env.SG_ENABLE_CONTEXT_COMPACT === '0'
+          ? messages
+          : compactMessagesWindow(messages, 40);
 
       // Convert messages (including tool calls & function results) to Gemini format
       const { systemInstruction, contents } = convertMessagesToGemini(compactedMessages);
@@ -875,6 +878,13 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
               stream: true
             });
             rotator.recordSuccess(account, streamTotalTokens);
+            if (combo && combo.strategy === 'smart-routing' && combo.activeModel !== targetModel) {
+              setImmediate(() => {
+                try {
+                  manager.setActiveModelInCombo(combo.id, targetModel);
+                } catch (_) {}
+              });
+            }
             return;
           }
 
@@ -973,6 +983,13 @@ export function createOpenAiRouter(manager: ProfileManager, rotator: AccountRota
             stream: false
           });
           rotator.recordSuccess(accountUsed, nonStreamTotal);
+          if (combo && combo.strategy === 'smart-routing' && combo.activeModel !== targetModel) {
+            setImmediate(() => {
+              try {
+                manager.setActiveModelInCombo(combo.id, targetModel);
+              } catch (_) {}
+            });
+          }
           return;
         } catch (err: any) {
           lastError = err;

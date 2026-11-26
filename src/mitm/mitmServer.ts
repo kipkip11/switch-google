@@ -6,6 +6,7 @@ import { CertManager } from './certManager';
 import { ProfileManager } from '../profiles/manager';
 import { AccountRotator } from '../profiles/rotator';
 import { ModelFallbackManager, normalizeDisplayModel, resolveUpstreamModel } from '../services/modelFallback';
+import { SmartRouter } from '../services/smartRouter';
 import { usageTracker } from '../usage/tracker';
 
 export class MitmServer {
@@ -143,13 +144,32 @@ export class MitmServer {
       let modelCandidates: string[] = [];
 
       if (activeCombo && activeCombo.models.length > 0) {
-        const chosen = activeCombo.activeModel || activeCombo.models[0];
-        const primaryUpstream = resolveUpstreamModel(chosen);
-        const otherUpstreams = activeCombo.models
-          .filter((m) => m !== chosen)
-          .map((m) => resolveUpstreamModel(m));
-        modelCandidates = Array.from(new Set([primaryUpstream, ...otherUpstreams]));
-        console.log(`[MitmFastPipe] ⚡ Áp dụng System Combo [${activeCombo.name}]: Model đã chọn [${chosen}] (${primaryUpstream})`);
+        if (activeCombo.strategy === 'smart-routing') {
+          const contentsOrMessages = parsedBody?.contents || parsedBody?.messages || [];
+          const tools = parsedBody?.tools || [];
+          const analysis = SmartRouter.calculateComplexity(contentsOrMessages, tools);
+          console.log(`[MitmFastPipe] 🧠 SmartRouter phân tích: isComplex=${analysis.isComplex}, score=${analysis.score} (${analysis.reason})`);
+          const prioritized = SmartRouter.prioritizeModels(activeCombo.models, analysis.isComplex);
+          
+          let orderedModels = prioritized;
+          if (activeCombo.activeModel && activeCombo.models.includes(activeCombo.activeModel)) {
+            const isChosenSmart = SmartRouter.isSmartModel(activeCombo.activeModel);
+            const isChosenFast = SmartRouter.isFastModel(activeCombo.activeModel);
+            if ((analysis.isComplex && isChosenSmart) || (!analysis.isComplex && isChosenFast)) {
+              orderedModels = [activeCombo.activeModel, ...prioritized.filter(m => m !== activeCombo.activeModel)];
+            }
+          }
+          modelCandidates = Array.from(new Set(orderedModels.map(m => resolveUpstreamModel(m))));
+          console.log(`[MitmFastPipe] ⚡ Áp dụng Smart-Routing [${activeCombo.name}]: Model ưu tiên hàng đầu [${orderedModels[0]}] -> ${modelCandidates[0]}`);
+        } else {
+          const chosen = activeCombo.activeModel || activeCombo.models[0];
+          const primaryUpstream = resolveUpstreamModel(chosen);
+          const otherUpstreams = activeCombo.models
+            .filter((m) => m !== chosen)
+            .map((m) => resolveUpstreamModel(m));
+          modelCandidates = Array.from(new Set([primaryUpstream, ...otherUpstreams]));
+          console.log(`[MitmFastPipe] ⚡ Áp dụng System Combo [${activeCombo.name}]: Model đã chọn [${chosen}] (${primaryUpstream})`);
+        }
       } else {
         modelCandidates = fallbackMgr.getUpstreamFallbackChain(originalModel);
       }
@@ -277,6 +297,13 @@ export class MitmServer {
                       stream: true
                     });
                     this.rotator.recordSuccess(creds.profile, finalTokens);
+                    if (activeCombo && activeCombo.strategy === 'smart-routing' && activeCombo.activeModel !== displayModel) {
+                      setImmediate(() => {
+                        try {
+                          this.profileManager.setActiveModelInCombo(activeCombo.id, displayModel);
+                        } catch (_) {}
+                      });
+                    }
                     resolve();
                   });
                 }
