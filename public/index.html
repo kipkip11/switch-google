@@ -100,6 +100,15 @@
           <span class="rail-label">Gói &amp; Hạn</span>
         </button>
 
+        <button class="rail-btn" role="tab" aria-selected="false" data-tab="tunnels" data-tooltip="Kết Nối Đa Thiết Bị" onclick="navigateTab('tunnels')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          <span class="rail-label-mobile">Kết Nối Đa Thiết Bị</span>
+        </button>
+
         <button class="rail-btn" role="tab" aria-selected="false" data-tab="integration" data-tooltip="Tích Hợp &amp; Direct Link" onclick="navigateTab('integration')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
@@ -785,10 +794,9 @@
         </section>
 
         <!-- ============================================================ -->
-        <!-- PANE 6: INTEGRATION & ANTIGRAVITY DIRECT LINK                -->
+        <!-- PANE: REMOTE & MULTI-DEVICE ACCESS (TAILSCALE & CLOUDFLARE) -->
         <!-- ============================================================ -->
-        <section class="view-pane" id="pane-integration" role="tabpanel">
-          <!-- CARD: REMOTE & MULTI-DEVICE ACCESS (TAILSCALE & CLOUDFLARE) -->
+        <section class="view-pane" id="pane-tunnels" role="tabpanel">
           <div class="card" style="margin-bottom: 20px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card);">
             <div class="card-header" style="padding: 18px 24px;">
               <div class="card-title-group">
@@ -797,9 +805,16 @@
                   <span class="badge badge-success" id="remote-tailscale-badge">Tailscale Ready</span>
                 </div>
                 <p class="card-desc" style="margin-top: 4px; color: var(--text-muted); font-size: 0.86rem;">
-                  Cho phép máy tính khác trong mạng LAN, qua Tailscale Mesh VPN, hoặc mở URL an toàn qua Cloudflare Tunnel để kết nối với Switch Google.
+                  Cho phép máy tính khác trong mạng LAN, qua Tailscale Mesh VPN, hoặc mở URL an toàn qua Cloudflare Tunnel để kết nối với Switch Google từ xa.
                 </p>
               </div>
+              <button class="btn btn-secondary btn-sm" onclick="fetchNetworkStatus()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Làm Mới
+              </button>
             </div>
 
             <div style="padding: 0 24px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
@@ -837,7 +852,12 @@
               </div>
             </div>
           </div>
+        </section>
 
+        <!-- ============================================================ -->
+        <!-- PANE 6: INTEGRATION & ANTIGRAVITY DIRECT LINK                -->
+        <!-- ============================================================ -->
+        <section class="view-pane" id="pane-integration" role="tabpanel">
           <div class="mitm-banner">
             <div class="card-header" style="margin-bottom: 0;">
               <div class="card-title-group">

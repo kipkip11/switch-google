@@ -16,6 +16,7 @@
     keys: 'Virtual API Keys',
     providers: 'Dịch Vụ AI (Multi-Providers)',
     subscriptions: 'Gói Đăng Ký & Thời Hạn',
+    tunnels: 'Kết Nối Đa Thiết Bị (Tailscale & Cloudflare)',
     integration: 'Tích Hợp & Direct Link',
     system: 'Hệ Thống & Sao Lưu'
   };
@@ -183,9 +184,10 @@
       window.fetchProviders?.();
     } else if (tabKey === 'subscriptions') {
       window.fetchSubscriptionsList?.();
+    } else if (tabKey === 'tunnels') {
+      window.fetchNetworkStatus?.();
     } else if (tabKey === 'integration') {
       window.checkMitmStatus?.();
-      window.fetchNetworkStatus?.();
     } else if (tabKey === 'system') {
       window.checkSystemVersion?.();
       window.fetchLocalSnapshots?.();
@@ -205,6 +207,7 @@
       { label: 'Chuyển đến: Virtual API Keys', sub: 'View', keywords: 'api keys virtual token secret', run: () => window.navigateTab('keys') },
       { label: 'Chuyển đến: Dịch Vụ AI', sub: 'View', keywords: 'providers ai models failover external', run: () => window.navigateTab('providers') },
       { label: 'Chuyển đến: Gói Đăng Ký & Thời Hạn', sub: 'View', keywords: 'subscriptions plans expire package account', run: () => window.navigateTab('subscriptions') },
+      { label: 'Chuyển đến: Kết Nối Đa Thiết Bị', sub: 'View', keywords: 'tunnels remote tailscale cloudflare mesh vpn network', run: () => window.navigateTab('tunnels') },
       { label: 'Chuyển đến: Tích Hợp & Direct Link', sub: 'View', keywords: 'integration mitm direct link cursor cline curl', run: () => window.navigateTab('integration') },
       { label: 'Chuyển đến: Hệ Thống & Sao Lưu', sub: 'View', keywords: 'system backup sqlite json update daemon restart', run: () => window.navigateTab('system') },
       { label: 'Thêm cổng tài khoản mới', sub: 'Action', keywords: 'add port account oauth web cookie key', run: () => window.openAddModal?.() },
